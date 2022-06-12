@@ -19,7 +19,6 @@ for i in range(10000):
         print("Step " + str(i))
     (obs, rew, end, info) = env.step([-80, 0, 1, 0, 0]) # Hard-left doughnuts!
     (obs, rew, end, info) = env.step([-80, 0, 0, 0, 0]) # Hard-left doughnuts!#
-    print(obs)
 
 raw_input("Press <enter> to exit... ")
 
