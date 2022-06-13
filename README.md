@@ -1,7 +1,7 @@
 ## Setup
 0. Make sure you have docker and docker compose installed
-1. Build your docker image from the given docker file with `sudo docker build -t <image_name>:<tag> .` (e.g.: `sudo docker build -t bz/mario-kart-a3c:0.0.5 .`)
-2. Create a file called `.env` and add the following line to it: `IMAGE_SPEC=<image_name>:<tag>` (e.g.: `IMAGE_SPEC=bz/mario-kart-a3c:0.0.5`)
+1. Build your docker image from the given docker file with `sudo docker build -t <image_name>:<tag> .` (e.g.: `sudo docker build -t mupen64_gym:one .`)
+2. Create a file called `.env` and add the following line to it: `IMAGE_SPEC=<image_name>:<tag>` (e.g.: `IMAGE_SPEC=mupen64_gym`)
 3. Download a MarioKart N64 ROM file (just use google) and place it in the `gym_mupen64plus/ROMs` folder with the name `marioKart.n64`
 
 ## Running the agent
