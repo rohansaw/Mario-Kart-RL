@@ -1,7 +1,7 @@
 # The port number to use for the controller server:
 PORT_NUMBER: 8082
 
-# How long, at most, in seconds to block waiting for the controller 
+# How long, at most, in seconds to block waiting for the controller
 #   server to send controls (the action) before returning:
 ACTION_TIMEOUT: 5
 

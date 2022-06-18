@@ -17,21 +17,21 @@ FROM base AS buildstuff
 
 RUN apt-get update && \
     apt-get install -y \
-        build-essential dpkg-dev libwebkitgtk-dev libjpeg-dev libtiff-dev libgtk2.0-dev \
-        libsdl1.2-dev libgstreamer-plugins-base0.10-dev libnotify-dev freeglut3 freeglut3-dev \
-        libjson-c2 libjson-c-dev \
-        git
+    build-essential apt-utils dpkg-dev libwebkitgtk-dev libjpeg-dev libtiff-dev libgtk2.0-dev \
+    libsdl1.2-dev libgstreamer-plugins-base0.10-dev libnotify-dev freeglut3 freeglut3-dev \
+    libjson-c2 libjson-c-dev \
+    git
 
 # clone, build, and install the input bot
 # (explicitly specifying commit hash to attempt to guarantee behavior within this container)
 WORKDIR /src/mupen64plus-src
 RUN git clone https://github.com/mupen64plus/mupen64plus-core && \
-        cd mupen64plus-core && \
-        git reset --hard 12d136dd9a54e8b895026a104db7c076609d11ff && \
+    cd mupen64plus-core && \
+    git reset --hard 12d136dd9a54e8b895026a104db7c076609d11ff && \
     cd .. && \
     git clone https://github.com/kevinhughes27/mupen64plus-input-bot && \
-        cd mupen64plus-input-bot && \
-        git reset --hard 0a1432035e2884576671ef9777a2047dc6c717a2 && \
+    cd mupen64plus-input-bot && \
+    git reset --hard 0a1432035e2884576671ef9777a2047dc6c717a2 && \
     make all && \
     make install
 
@@ -43,14 +43,14 @@ FROM base
 # Update package cache and install dependencies
 RUN apt-get update && \
     apt-get install -y \
-        python python-pip python-setuptools python-dev \
-        wget \
-        xvfb libxv1 x11vnc \
-        imagemagick \
-        mupen64plus \
-        nano \
-        ffmpeg \
-        libjson-c2
+    python python-pip python-setuptools python-dev \
+    wget \
+    xvfb libxv1 x11vnc \
+    imagemagick \
+    mupen64plus \
+    nano \
+    ffmpeg \
+    libjson-c2
 
 # Upgrade pip (pip 21.0 dropped support for Python 2.7 in January 2021 - https://stackoverflow.com/a/65896996/9526448)
 # TODO: Python3 upgrade - https://github.com/bzier/gym-mupen64plus/issues/81
