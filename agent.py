@@ -1,29 +1,64 @@
-#!/bin/python
+from ast import arg
 import time
 import gym, gym_mupen64plus
+from threading import Thread
+from multiprocessing import Process
+import argparse
+import logging
 
-env = gym.make('Mario-Kart-Luigi-Raceway-v0')
-env.reset()
-env.render()
+from src.utils import set_logging
 
-print("NOOP waiting for green light")
-for i in range(100):
-    (obs, rew, end, info) = env.step([0, 0, 0, 0, 0]) # NOOP until green light
-    env.render()
+class MarioKartAgent():
+    def __init__(self, graphic_output=True):
+        self.env = gym.make('Mario-Kart-Luigi-Raceway-v0')
+        self.env.reset()
+        if graphic_output:
+            self.env.render()
+        
+        self.graphic_output = graphic_output
+    
+    def step(self, action):
+        obs, rew, end, info = self.env.step(action)
+        if self.graphic_output:
+            self.env.render()
+        return obs, rew, end, info
+    
+    def run(self):
+        logging.info("phase 1")
+        for _ in range(100):
+            (obs, rew, end, info) = self.step([0, 0, 0, 0, 0]) # NOOP until green light
+            # self.env.render()
+        logging.info("phase 2")
+        for _ in range(100):
+            (obs, rew, end, info) = self.step([0, 0, 1, 0, 0]) # forward
+            # self.render()
+        logging.info("phase 3")
+        for i in range(500):
+            (obs, rew, end, info) = self.step([(-60 if (i % 20 < 10) else 10), 0, 1, 0, 0]) # weird snake lines
+            # self.env.render()
+        input("press <enter> to exit....")
+        self.running = False
+        self.env.close()
+            
 
-print("GO! ...drive straight as fast as possible...")
-for i in range(50):
-    (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
-    env.render()
 
-print("Doughnuts!!")
-for i in range(10000):
-    if i % 100 == 0:
-        print("Step " + str(i))
-    (obs, rew, end, info) = env.step([-80, 0, 1, 0, 0]) # Hard-left doughnuts!
-    (obs, rew, end, info) = env.step([-80, 0, 0, 0, 0]) # Hard-left doughnuts!#
-    env.render()
+def main(args):
+    set_logging(args.log_file, args.log_level, not args.stop_log_stdout)
+    agent = MarioKartAgent(args.graphic_output)
+    agent.run()
 
-raw_input("Press <enter> to exit... ")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("RL Agent for Mario Kart for N64 Emulator")
+    parser.add_argument("--log-level", type=str, default="info",
+                     choices=["debug", "info", "warning", "error", "critical"],
+                     help="log level for logging message output")
+    parser.add_argument("--log-file", type=str, default="log.log",
+                     help="output file path for logging. default to stdout")
+    parser.add_argument("--stop-log-stdout", action="store_false", default=True,
+                     help="toggles force logging to stdout. if a log file is specified, logging will be "
+                     "printed to both the log file and stdout")
+    parser.add_argument("--graphic-output", action="store_true", default=False,
+                        help="toggles weather the graphical output of Mario Kart should be rendered")
 
-env.close()
+    args = parser.parse_args()
+    main(args)
