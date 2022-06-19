@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 
 PY3_OR_LATER = sys.version_info[0] >= 3
@@ -156,6 +157,7 @@ class Mupen64PlusEnv(gym.Env):
         return obs, reward, self.episode_over, {}
 
     def _act(self, action, count=1):
+        # print("got action:", action)
         for _ in itertools.repeat(None, count):
             self.controller_server.send_controls(ControllerState(action))
 
@@ -263,7 +265,17 @@ class Mupen64PlusEnv(gym.Env):
         if not os.path.isfile(rom_path):
             msg = "ROM not found: " + rom_path
             cprint(msg, 'red')
-            raise Exception(msg)
+            rom_dir = Path(rom_path).parent
+            download = input("Do you want to download and extract the file? Y/N ")
+            if download == "Y":
+                download_url = "https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip"
+                os.system(f"wget {download_url} -O /tmp/marioKart.zip")
+                os.system(f"unzip /tmp/marioKart.zip -d {str(rom_dir.resolve())}")
+                os.system(f"mv '{str(rom_dir.resolve() / 'Mario Kart 64 (USA).n64')}' {rom_path}")
+                cprint("Rom file downloaded!")
+            else:
+                raise Exception(msg)
+                
 
         input_driver_path = os.path.abspath(os.path.expanduser(input_driver_path))
         if not os.path.isfile(input_driver_path):
@@ -382,6 +394,7 @@ class ControllerState(object):
     JOYSTICK_RIGHT     = [ 127,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
 
     def __init__(self, controls=NO_OP):
+        # print("doing controls:", controls)
         self.X_AXIS = controls[0]
         self.Y_AXIS = controls[1]
         self.A_BUTTON = controls[2]
