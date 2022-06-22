@@ -1,0 +1,17 @@
+2022-06-22 09:58:50 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 09:59:04 - INFO [agent.py : run() : l. 27]: phase 1
+2022-06-22 09:59:10 - INFO [agent.py : run() : l. 31]: phase 2
+2022-06-22 09:59:16 - INFO [agent.py : run() : l. 35]: phase 3
+2022-06-22 10:00:11 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 10:00:24 - INFO [agent.py : run() : l. 27]: phase 1
+2022-06-22 10:02:52 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 10:03:13 - INFO [agent.py : run() : l. 27]: phase 1
+2022-06-22 10:03:20 - INFO [agent.py : run() : l. 31]: phase 2
+2022-06-22 10:03:39 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 10:04:46 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 10:05:11 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 10:06:01 - INFO [agent.py : run() : l. 27]: phase 1
+2022-06-22 10:06:15 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-22 10:06:28 - INFO [agent.py : run() : l. 27]: phase 1
+2022-06-22 10:06:34 - INFO [agent.py : run() : l. 31]: phase 2
+2022-06-22 10:06:40 - INFO [agent.py : run() : l. 35]: phase 3

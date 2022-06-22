@@ -1,5 +1,9 @@
 from ast import arg
 import time
+
+import torch
+from actor import LSTMActor
+from critic import Critic
 import gym, gym_mupen64plus
 from threading import Thread
 from multiprocessing import Process
@@ -12,6 +16,10 @@ class MarioKartAgent():
     def __init__(self, graphic_output=True):
         self.env = gym.make('Mario-Kart-Luigi-Raceway-v0')
         self.env.reset()
+        self.actor = LSTMActor()
+        self.critic = Critic()
+        self.actor_optimizer = torch.optim.Adam()
+        self.critic_optimizer = torch.optim.Adam()
         if graphic_output:
             self.env.render()
         
@@ -27,15 +35,15 @@ class MarioKartAgent():
         logging.info("phase 1")
         for _ in range(100):
             (obs, rew, end, info) = self.step([0, 0, 0, 0, 0]) # NOOP until green light
-            # self.env.render()
+            self.env.render()
         logging.info("phase 2")
         for _ in range(100):
             (obs, rew, end, info) = self.step([0, 0, 1, 0, 0]) # forward
-            # self.render()
+            self.env.render()
         logging.info("phase 3")
         for i in range(500):
             (obs, rew, end, info) = self.step([(-60 if (i % 20 < 10) else 10), 0, 1, 0, 0]) # weird snake lines
-            # self.env.render()
+            self.env.render()
         input("press <enter> to exit....")
         self.running = False
         self.env.close()
