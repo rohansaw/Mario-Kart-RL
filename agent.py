@@ -34,8 +34,10 @@ class MarioKartAgent():
         return obs, rew, end, info
 
     def select_action(self, state):
-        # ToDo sample action to take from actor
-        pass
+        probs = self.actor(state)
+        # Use a categorical policy to sample the action that should be played next
+        prob_dist = torch.distributions.Categorical(probs)
+        return prob_dist.sample()
 
     def conditional_render(self):
         if self.graphic_output:
