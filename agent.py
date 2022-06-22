@@ -33,7 +33,8 @@ class MarioKartAgent():
         self.conditional_render()
         return obs, rew, end, info
 
-    def select_action(self):
+    def select_action(self, state):
+        # ToDo sample action to take from actor
         pass
 
     def conditional_render(self):
@@ -67,7 +68,7 @@ class MarioKartAgent():
 
             logging.info("phase 2") # Train actor and critic networks
             for t in range(1,self.max_steps):
-                action = self.select_action()
+                action = self.select_action(state)
                 next_state, observed_reward, terminated, info = self.step(action)
                 self.train(state=state, next_state=next_state,
                            action=action, observed_reward=observed_reward)
