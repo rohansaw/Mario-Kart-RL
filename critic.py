@@ -1,10 +1,10 @@
 from torch.nn import Module
 import torch.nn as nn
 
-class Critic(Module):
+class SimpleCritic(Module):
 
     def __init__(self, input_size, hidden_size, output_size):
-        super(Critic, self).__init__()
+        super(SimpleCritic, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, output_size)

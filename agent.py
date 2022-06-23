@@ -2,29 +2,33 @@ from ast import arg
 import time
 
 import torch
-from actor import LSTMActor
-from critic import Critic
+from actor import LSTMActor, SimpleActor
+from critic import SimpleCritic
 import gym, gym_mupen64plus
 from threading import Thread
 from multiprocessing import Process
 import argparse
 import logging
-
 from src.utils import set_logging
 
 class MarioKartAgent():
     def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000):
-        self.env = gym.make('Mario-Kart-Luigi-Raceway-v0')
-        self.actor = LSTMActor()
-        self.critic = Critic()
-        # ToDo initialize actor and critic networks
-        self.actor_optimizer = torch.optim.Adam()
-        self.critic_optimizer = torch.optim.Adam()
+        self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
+        hidden_size = (self.env.action_space.n + self.env.observation_space.shape) / 2
+        self.actor = SimpleActor(input_size=self.env.observation_space.shape,
+                                 hidden_size=hidden_size,
+                                 output_size=self.env.action_space.n)
+        self.critic = SimpleCritic(input_size=self.env.observation_space.shape,
+                             hidden_size=hidden_size,
+                             output_size=1)
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.alpha = 0.01 # actor lr
         self.beta = 0.01 # critic lr
         self.gamma = 0.99 # discount factor
+
+        self.actor_optimizer = torch.optim.Adam(self.actor.paramters(), lr=self.alpha)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.beta)
         
         self.graphic_output = graphic_output
     
@@ -34,10 +38,13 @@ class MarioKartAgent():
         return obs, rew, end, info
 
     def select_action(self, state):
+        '''Returns one-hot encoded action to play next and log_prob of this action in the distribution'''
         probs = self.actor(state)
         # Use a categorical policy to sample the action that should be played next
         prob_dist = torch.distributions.Categorical(probs)
-        return prob_dist.sample()
+        action_index = prob_dist.sample() # Returns index of action to plays
+        action_prob = prob_dist.log_prob(action_index)
+        return torch.nn.functional.one_hot(action_index, self.env.action_space.n), action_prob
 
     def conditional_render(self):
         if self.graphic_output:
@@ -49,9 +56,16 @@ class MarioKartAgent():
         error = target - self.critic(state)
         return  error
 
-    def train(self, state, next_state, action, observed_reward):
+    def train(self, state, next_state, action_prob, observed_reward):
         advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
-        # ToDo calculate actor and critic loss based on advantage and update network based on that
+        # Critic loss is basically MSE, since advantage is the error we square it
+        critic_loss = advantage.pow(2)
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        actor_loss = -action_prob*advantage.detach()
+        actor_loss.backward()
+        self.actor_optimizer.step()
 
     def reset(self):
         self.state = self.env.reset()
@@ -70,10 +84,11 @@ class MarioKartAgent():
 
             logging.info("phase 2") # Train actor and critic networks
             for t in range(1,self.max_steps):
-                action = self.select_action(state)
+                action, action_prob = self.select_action(state)
+                # ToDo maybe? Do we need some kind of mapping to correct controller actions form onehot encoded action
                 next_state, observed_reward, terminated, info = self.step(action)
                 self.train(state=state, next_state=next_state,
-                           action=action, observed_reward=observed_reward)
+                           action_prob=action_prob, observed_reward=observed_reward)
 
                 episode_reward += observed_reward
                 state = next_state

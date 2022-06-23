@@ -15,3 +15,7 @@
 2022-06-22 10:06:28 - INFO [agent.py : run() : l. 27]: phase 1
 2022-06-22 10:06:34 - INFO [agent.py : run() : l. 31]: phase 2
 2022-06-22 10:06:40 - INFO [agent.py : run() : l. 35]: phase 3
+2022-06-23 12:00:44 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-23 12:02:22 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Luigi-Raceway-v0
+2022-06-23 12:05:15 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Discrete-Luigi-Raceway-v0
+2022-06-23 12:06:07 - INFO [registration.py : make() : l. 117]: Making new env: Mario-Kart-Discrete-Luigi-Raceway-v0

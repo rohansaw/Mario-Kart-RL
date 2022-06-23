@@ -2,6 +2,20 @@ from torch.nn import Module
 import torch.nn as nn
 import torch
 
+class SimpleActor(Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(SimpleActor).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        out = nn.functional.relu(self.fc1(x))
+        out = nn.functional.relu(self.fc2(out))
+        out = self.fc3(out)
+        return out
+
+# ToDo, not working yet
 class LSTMActor(Module):
     def __init__(self, input_size, hidden_size, num_layers, num_actions):
         super().__init__()
