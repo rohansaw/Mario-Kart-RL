@@ -1,10 +1,10 @@
 #!/bin/bash
 
-if [[ $UID != 0 ]]; then
-    echo "Please run this script with sudo:"
-    echo "sudo $0 $*"
-    exit 1
-fi
+# if [[ $UID != 0 ]]; then
+#     echo "Please run this script with sudo:"
+#     echo "sudo $0 $*"
+#     exit 1
+# fi
 
 
 # Prevent dpkg from prompting for user input during package setup
@@ -15,8 +15,8 @@ PATH=$PATH:/usr/games \
 DISPLAY=:0
 
 # install required packages
-apt-get update && \
-apt-get install -y \
+sudo apt-get update && \
+sudo apt-get install -y \
         build-essential dpkg-dev \
         git \
         python3 python3-pip python3-setuptools python3-dev \
@@ -42,19 +42,19 @@ cd .. && \
 git clone https://github.com/kevinhughes27/mupen64plus-input-bot && \
     cd mupen64plus-input-bot && \
     git reset --hard 0a1432035e2884576671ef9777a2047dc6c717a2 && \
-make all && \
-make install
+sudo make all && \
+sudo make install
 cd ..
 
 # # Install VirtualGL (provides vglrun to allow us to run the emulator in XVFB)
 # # (Check for new releases here: https://github.com/VirtualGL/virtualgl/releases)
 VIRTUALGL_VERSION=2.5.2
 wget "https://sourceforge.net/projects/virtualgl/files/${VIRTUALGL_VERSION}/virtualgl_${VIRTUALGL_VERSION}_amd64.deb" && \
-    apt install ./virtualgl_${VIRTUALGL_VERSION}_amd64.deb && \
+    sudo apt install ./virtualgl_${VIRTUALGL_VERSION}_amd64.deb && \
     rm virtualgl_${VIRTUALGL_VERSION}_amd64.deb
 cd ..
 
-apt install virtualenv
+sudo apt install virtualenv
 virtualenv venv
 . venv/bin/activate
 pip install -e .
