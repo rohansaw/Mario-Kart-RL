@@ -10,24 +10,21 @@ from multiprocessing import Process
 import argparse
 import logging
 from src.utils import set_logging
+from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
 
 class MarioKartAgent():
     def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-        hidden_size = (self.env.action_space.n + self.env.observation_space.shape) / 2
         self.actor = SimpleActor(input_size=self.env.observation_space.shape,
-                                 hidden_size=hidden_size,
                                  output_size=self.env.action_space.n)
-        self.critic = SimpleCritic(input_size=self.env.observation_space.shape,
-                             hidden_size=hidden_size,
-                             output_size=1)
+        self.critic = SimpleCritic(input_size=self.env.observation_space.shape)
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.alpha = 0.01 # actor lr
         self.beta = 0.01 # critic lr
         self.gamma = 0.99 # discount factor
 
-        self.actor_optimizer = torch.optim.Adam(self.actor.paramters(), lr=self.alpha)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.alpha)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.beta)
         
         self.graphic_output = graphic_output
@@ -36,15 +33,20 @@ class MarioKartAgent():
         obs, rew, end, info = self.env.step(action)
         self.conditional_render()
         return obs, rew, end, info
-
+    
     def select_action(self, state):
         '''Returns one-hot encoded action to play next and log_prob of this action in the distribution'''
+        print("forwarding: ", state.shape, state)
+        state = torch.movedim(torch.from_numpy(state.copy()), 2, 0).unsqueeze(0)
         probs = self.actor(state)
+        
         # Use a categorical policy to sample the action that should be played next
         prob_dist = torch.distributions.Categorical(probs)
         action_index = prob_dist.sample() # Returns index of action to plays
         action_prob = prob_dist.log_prob(action_index)
-        return torch.nn.functional.one_hot(action_index, self.env.action_space.n), action_prob
+        print(action_index, type(action_index))
+        action = DiscreteActions.get_action(action_index[0])
+        return action, action_prob
 
     def conditional_render(self):
         if self.graphic_output:
@@ -68,18 +70,19 @@ class MarioKartAgent():
         self.actor_optimizer.step()
 
     def reset(self):
-        self.state = self.env.reset()
+        obs = self.env.reset()
         self.conditional_render()
+        return obs
 
     def run(self):
         rewards = [] # Rewards of all episodes
         for episode_num in range(1, self.num_episodes):
-            self.reset()
+            state = self.reset()
             episode_reward = 0
 
             logging.info("phase 1") # NOOP until green light
             for _ in range(100):
-                (obs, rew, end, info) = self.step([0, 0, 0, 0, 0]) 
+                (obs, rew, end, info) = self.step(0) 
                 self.conditional_render()
 
             logging.info("phase 2") # Train actor and critic networks

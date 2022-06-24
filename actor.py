@@ -3,17 +3,27 @@ import torch.nn as nn
 import torch
 
 class SimpleActor(Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(SimpleActor).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
+    def __init__(self, input_size, output_size):
+        super(SimpleActor, self).__init__()
+        
+        num_channels = input_size[0]
+        self.model = nn.Sequential(
+            nn.Conv2d(num_channels, 64, kernel_size=3, padding=1),
+            nn.ReLU(), # max(0, x)
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(), # max(0, x)
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.ReLU(), # max(0, x)
+            nn.Flatten(),
+            nn.Linear(256 * input_size[1] * input_size[2], 512),
+            nn.ReLU(), # max(0, x)
+            nn.Linear(512, 128),
+            nn.Sigmoid(), # max(0, x)
+            nn.Linear(128, output_size),
+        )
 
     def forward(self, x):
-        out = nn.functional.relu(self.fc1(x))
-        out = nn.functional.relu(self.fc2(out))
-        out = self.fc3(out)
-        return out
+        return self.model(x) # num actions x 1 
 
 # ToDo, not working yet
 class LSTMActor(Module):

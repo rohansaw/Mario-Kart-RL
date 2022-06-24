@@ -26,6 +26,10 @@ class DiscreteActions:
     def get_controls_from_action(action):
         return DiscreteActions.ACTION_MAP[action][1]
 
+    @staticmethod
+    def get_action(index):
+        return DiscreteActions.ACTION_MAP[index][1]
+
 
 class MarioKartDiscreteEnv(MarioKartEnv):
 
