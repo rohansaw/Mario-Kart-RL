@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import socket
 
 PY3_OR_LATER = sys.version_info[0] >= 3
 
@@ -73,7 +74,7 @@ class Mupen64PlusEnv(gym.Env):
         self.frame_skip = self.config['FRAME_SKIP']
         if self.frame_skip < 1:
             self.frame_skip = 1
-        self.controller_server, self.controller_server_thread = self._start_controller_server()
+        self.controller_server = self._start_controller_server()
 
 
         initial_disp = os.environ["DISPLAY"]
@@ -148,18 +149,32 @@ class Mupen64PlusEnv(gym.Env):
 
     def _step(self, action):
         #cprint('Step %i: %s' % (self.step_count, action), 'green')
+        start = time.time()
         self._act(action)
+        end = time.time()
+        # print("step time:", end - start)
+        start = time.time()
         obs = self._observe()
+        end = time.time()
+        # print("observe time:", end - start)
+        start = time.time()
         self.episode_over = self._evaluate_end_state()
+        end = time.time()
+        # print("_evaluate_end_state time:", end - start)
+        start = time.time()
         reward = self._get_reward()
+        end = time.time()
+        # print("_get_reward time:", end - start)
 
         self.step_count += 1
         return obs, reward, self.episode_over, {}
 
     def _act(self, action, count=1):
-        # print("got action:", action)
+        # print("got action:", action, "count:", count)
         for _ in itertools.repeat(None, count):
+            # print("sending...")
             self.controller_server.send_controls(ControllerState(action))
+        # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
         self._act(ControllerState.NO_OP, count=count)
@@ -235,14 +250,18 @@ class Mupen64PlusEnv(gym.Env):
         self._stop_controller_server()
 
     def _start_controller_server(self):
-        server = ControllerHTTPServer(server_address  = ('', self.config['PORT_NUMBER']),
-                                      control_timeout = self.config['ACTION_TIMEOUT'],
-                                      frame_skip      = self.frame_skip) # TODO: Environment argument (with issue #26)
-        server_thread = threading.Thread(target=server.serve_forever, args=())
-        server_thread.daemon = True
-        server_thread.start()
-        print('ControllerHTTPServer started on port ', self.config['PORT_NUMBER'])
-        return server, server_thread
+        print("fs:", self.frame_skip)
+        server = ControllerUpdater(
+            input_host  = '',
+            input_port= self.config['PORT_NUMBER'],
+            control_timeout = self.config['ACTION_TIMEOUT'],
+            frame_skip = self.frame_skip) # TODO: Environment argument (with issue #26)
+        # server_thread = threading.Thread(target=server.serve_forever, args=())
+        # server_thread.daemon = True
+        # server_thread.start()
+        print('ControllerUpdater started on port ', self.config['PORT_NUMBER'])
+        return server
+        # return server, server_thread
 
     def _stop_controller_server(self):
         #cprint('Stop Controller Server called!', 'yellow')
@@ -331,8 +350,12 @@ class Mupen64PlusEnv(gym.Env):
             cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
 
             cmd = [self.config['VGLRUN_CMD'], "-d", ":" + str(display_num)] + cmd
+        # else:
+        #     cmd.append("--noosd")
 
         cprint('Starting emulator with comand: %s' % cmd, 'yellow')
+        
+        print("COMMAND: ", " ".join(cmd))
 
         emulator_process = subprocess.Popen(cmd,
                                             env=os.environ.copy(),
@@ -411,50 +434,75 @@ class ControllerState(object):
         self.D_DPAD = controls[13]
         self.U_DPAD = controls[14]
         self.START_BUTTON = controls[15]
-
-    def to_json(self):
-        return json.dumps(self.__dict__)
-
-###############################################
-class ControllerHTTPServer(HTTPServer, object):
-
-    def __init__(self, server_address, control_timeout, frame_skip):
-        self.control_timeout = control_timeout
-        self.controls = ControllerState()
-        self.controls_updated = threading.Event()
-        self.response_sent = threading.Event()
-        self.running = True
-        self.responses_sent = 0
-        self.frame_skip = frame_skip
-        self.frame_skip_enabled = True
-        super(ControllerHTTPServer, self).__init__(server_address, self.ControllerRequestHandler)
-
-    def send_controls(self, controls):
-        self.responses_sent = 0
         self.controls = controls
 
-        # Tell the request handler that the controls have been updated so it can send the response now:
-        self.controls_updated.set()
+    def to_msg(self):
+        # return json.dumps(self.__dict__)
+        return "|".join([str(i) for i in self.controls])
 
-        # Wait for response to actually be sent before returning:
-        if self.running:
-            self.response_sent.wait()
-            self.response_sent.clear()
+###############################################
+class ControllerUpdater(object):
+
+    def __init__(self, input_host, input_port, control_timeout, frame_skip):
+        self.control_timeout = control_timeout
+        self.controls = ControllerState()
+        self.input_host = input_host
+        self.input_port = input_port
+        # self.controls_updated = threading.Event()
+        # self.response_sent = threading.Event()
+        self.running = True
+        self.frame_skip = frame_skip
+        self.frame_skip_enabled = True
+
+    def send_controls(self, controls):
+        if not self.running:
+            return
+        self.controls = controls
+        msg = self.controls.to_msg()
+        msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
+        # msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
+        # print("sending", msg)
+        # if not self.socket.connected
+        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        
+        # print("one")
+        try:
+            # print("normal one")
+            self.socket.sendall(msg.encode())
+            # time.sleep(0.1)
+            self.socket.recv(1)
+        except:
+            # print("reconnect")
+            # start = time.time()
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # start2 = time.time()
+            self.socket.connect((self.input_host, self.input_port))
+            # end = time.time()
+            # print("took:", end - start, "mid:", (end - start2))
+            self.socket.sendall(msg.encode())
+            self.socket.recv(1)
+        # time.sleep(1)
+
+        # Tell the request handler that the controls have been updated so it can send the response now:
+        # self.controls_updated.set()
+
+        # Wait for response to actually be sent before returning:-V rtable] [-W recvlimit][-w timeout] [-X proxy_protocol] [-x proxy_a
 
     def shutdown(self):
         self.running = False
+        self.socket.close()
 
-        # Make sure we aren't blocking on anything:
-        self.response_sent.set()
-        self.controls_updated.set()
+        # # Make sure we aren't blocking on anything:
+        # self.response_sent.set()
+        # self.controls_updated.set()
 
-        # Shutdown the server:
-        if PY3_OR_LATER:
-            super().shutdown()
-            super().server_close()
-        else:
-            super(ControllerHTTPServer, self).shutdown()
-            super(ControllerHTTPServer, self).server_close()
+        # # Shutdown the server:
+        # if PY3_OR_LATER:
+        #     super().shutdown()
+        #     super().server_close()
+        # else:
+        #     super(ControllerHTTPServer, self).shutdown()
+        #     super(ControllerHTTPServer, self).server_close()
 
     # http://preshing.com/20110920/the-python-with-statement-by-example/#implementing-the-context-manager-as-a-generator
     @contextmanager
@@ -463,38 +511,38 @@ class ControllerHTTPServer(HTTPServer, object):
         yield True
         self.frame_skip_enabled = True
 
-    class ControllerRequestHandler(BaseHTTPRequestHandler, object):
+    # class ControllerRequestHandler(BaseHTTPRequestHandler, object):
 
-        def log_message(self, fmt, *args):
-            pass
+    #     def log_message(self, fmt, *args):
+    #         pass
 
-        def write_response(self, resp_code, resp_data):
-            self.send_response(resp_code)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(resp_data.encode())
+    #     def write_response(self, resp_code, resp_data):
+    #         self.send_response(resp_code)
+    #         self.send_header("Content-type", "application/json")
+    #         self.end_headers()
+    #         self.wfile.write(resp_data.encode())
 
-        def do_GET(self):
-            # Wait for the controls to be updated before responding:
-            if self.server.running:
-                self.server.controls_updated.wait()
+    #     def do_GET(self):
+    #         # Wait for the controls to be updated before responding:
+    #         if self.server.running:
+    #             self.server.controls_updated.wait()
 
-            if not self.server.running:
-                print('Sending SHUTDOWN response')
-                # TODO: This sometimes fails with a broken pipe because
-                # the emulator has already stopped. Should handle gracefully (Issue #4)
-                self.write_response(500, "SHUTDOWN")
-            else:
-                ### respond with controller output
-                self.write_response(200, self.server.controls.to_json())
+    #         if not self.server.running:
+    #             print('Sending SHUTDOWN response')
+    #             # TODO: This sometimes fails with a broken pipe because
+    #             # the emulator has already stopped. Should handle gracefully (Issue #4)
+    #             self.write_response(500, "SHUTDOWN")
+    #         else:
+    #             ### respond with controller output
+    #             self.write_response(200, self.server.controls.to_json())
 
-            self.server.responses_sent += 1
+    #         self.server.responses_sent += 1
 
-            # If we have sent the controls 'n' times now...
-            if self.server.responses_sent >= self.server.frame_skip or not self.server.frame_skip_enabled:
-                # ...we fire the response_sent event so the next action can happen:
-                self.server.controls_updated.clear()
-                self.server.response_sent.set()
+    #         # If we have sent the controls 'n' times now...
+    #         if self.server.responses_sent >= self.server.frame_skip or not self.server.frame_skip_enabled:
+    #             # ...we fire the response_sent event so the next action can happen:
+    #             self.server.controls_updated.clear()
+    #             self.server.response_sent.set()
 
 
 
