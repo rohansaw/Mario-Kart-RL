@@ -32,7 +32,7 @@ sudo apt-get install -y \
 
 # # clone, build, and install the input bot
 # # (explicitly specifying commit hash to attempt to guarantee behavior within this container)
-rm -r install
+sudo rm -fr install
 mkdir install
 cd install
 git clone https://github.com/mupen64plus/mupen64plus-core && \
