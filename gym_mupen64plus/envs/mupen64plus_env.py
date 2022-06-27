@@ -48,13 +48,15 @@ class ImageHelper:
 ###############################################
 
 # The width, height, and depth of the emulator window:
-SCR_W = 640
-SCR_H = 480
+SCR_W = 320
+SCR_H = 240
 SCR_D = 3
 
 MILLISECOND = 1.0 / 1000.0
 
 IMAGE_HELPER = ImageHelper()
+
+BENCHMARK = False
 
 
 ###############################################
@@ -303,7 +305,7 @@ class Mupen64PlusEnv(gym.Env):
             raise Exception(msg)
 
         cmd = [self.config['MUPEN_CMD'],
-               "--nospeedlimit",
+               "--nospeedlimit" if BENCHMARK else "",
                "--nosaveoptions",
                "--resolution",
                "%ix%i" % (res_w, res_h),
@@ -460,10 +462,6 @@ class ControllerUpdater(object):
         self.controls = controls
         msg = self.controls.to_msg()
         msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
-        # msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
-        # print("sending", msg)
-        # if not self.socket.connected
-        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         
         # print("one")
         try:

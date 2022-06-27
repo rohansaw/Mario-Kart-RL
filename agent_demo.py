@@ -18,14 +18,15 @@ for i in range(100):
 
 print("GO! ...drive straight as fast as possible...")
 start = time.time()
-for i in range(100):
+for i in range(1000):
     # if i != 0 and i % 10 == 0:
     #     start = end
     (obs, rew, end, info) = env.step(1) # Drive straight
     if render:
         env.render()
 end = time.time()
-print(100 / (end - start), "frames per second, total:", (end-start), "seconds")
+print(1000 / (end - start), "frames per second, total:", (end-start), "seconds")
+print((end - start), "seconds for 1000 steps")
 
 # print("Doughnuts!!")
 # for i in range(10000):
