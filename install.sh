@@ -35,10 +35,12 @@ sudo apt-get install -y \
 sudo rm -fr install
 mkdir install
 cd install
-git clone https://github.com/Snagnar/mupen64plus-core.git && \
+git clone https://github.com/mupen64plus/mupen64plus-core.git && \
     cd mupen64plus-core && \
+    git reset --hard 12d136dd9a54e8b895026a104db7c076609d11ff && \
 cd .. && \
-git clone https://github.com/snagnar/mupen64plus-input-bot && \
+git clone -b reverts git@github.com:Snagnar/mupen64plus-input-bot.git && \
+# git clone https://github.com/snagnar/mupen64plus-input-bot && \
     cd mupen64plus-input-bot && \
 sudo make all && \
 sudo make install
