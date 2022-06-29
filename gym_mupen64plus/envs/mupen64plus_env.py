@@ -54,6 +54,7 @@ SCR_W = 320
 SCR_H = 240
 SCR_D = 3
 
+COUNTPEROP = 1
 MILLISECOND = 1.0 / 1000.0
 
 IMAGE_HELPER = ImageHelper()
@@ -66,11 +67,16 @@ class Mupen64PlusEnv(gym.Env):
     __metaclass__ = abc.ABCMeta
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, low_res_mode=True, benchmark=True):
+    # def __init__(self, benchmark=True, res_w=160, res_h=120):
+    def __init__(self, benchmark=True, res_w=320, res_h=240):
         global SCR_W, SCR_H
-        if not low_res_mode and not benchmark:
-            SCR_W = 640
-            SCR_H = 240
+        # if not low_res_mode and not benchmark:
+        #     SCR_W = 640
+        #     SCR_H = 480
+        SCR_W, SCR_H = res_w, res_h
+        self.res_w = res_w
+        self.res_h = res_h
+        
         self.viewer = None
         self.benchmark = benchmark
         self.reset_count = 0
@@ -97,7 +103,8 @@ class Mupen64PlusEnv(gym.Env):
             self.xvfb_process, self.emulator_process = \
                 self._start_emulator(rom_name=self.config['ROM_NAME'],
                                      gfx_plugin=self.config['GFX_PLUGIN'],
-                                     input_driver_path=self.config['INPUT_DRIVER_PATH'])
+                                     input_driver_path=self.config['INPUT_DRIVER_PATH'],
+                                     res_w=SCR_W, res_h=SCR_H, res_d=SCR_D)
 
         # TODO: Test and cleanup:
         # May need to initialize this after the DISPLAY env var has been set
@@ -314,13 +321,14 @@ class Mupen64PlusEnv(gym.Env):
             cprint(msg, 'red')
             raise Exception(msg)
         
+        print("got COUNTPEROP", COUNTPEROP)
         benchmark_options = [
                 "--nospeedlimit",
-                "--set", "Core[CountPerOp]=1",
-                "--set", "Video-Rice[ScreenUpdateSetting]=3",
-                "--set", "Video-Rice[FastTextureLoading]=1",
-                "--set", "Video-Rice[TextureQuality]=2",
-                "--set", "Video-Rice[ColorQuality]=1",
+                "--set", f"Core[CountPerOp]={COUNTPEROP}",
+                # "--set", "Video-Rice[ScreenUpdateSetting]=3",
+                # "--set", "Video-Rice[FastTextureLoading]=1",
+                # "--set", "Video-Rice[TextureQuality]=2",
+                # "--set", "Video-Rice[ColorQuality]=1",
         ]
 
         cmd = [self.config['MUPEN_CMD'],
