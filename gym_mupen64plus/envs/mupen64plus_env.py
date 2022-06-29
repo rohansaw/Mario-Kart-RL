@@ -48,13 +48,18 @@ class ImageHelper:
 ###############################################
 
 # The width, height, and depth of the emulator window:
-SCR_W = 640
-SCR_H = 480
+# SCR_W = 640
+# SCR_H = 480
+SCR_W = 320
+SCR_H = 240
 SCR_D = 3
 
+COUNTPEROP = 1
 MILLISECOND = 1.0 / 1000.0
 
 IMAGE_HELPER = ImageHelper()
+
+BENCHMARK = False
 
 
 ###############################################
@@ -62,8 +67,18 @@ class Mupen64PlusEnv(gym.Env):
     __metaclass__ = abc.ABCMeta
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
+    # def __init__(self, benchmark=True, res_w=160, res_h=120):
+    def __init__(self, benchmark=True, res_w=320, res_h=240):
+        global SCR_W, SCR_H
+        # if not low_res_mode and not benchmark:
+        #     SCR_W = 640
+        #     SCR_H = 480
+        SCR_W, SCR_H = res_w, res_h
+        self.res_w = res_w
+        self.res_h = res_h
+        
         self.viewer = None
+        self.benchmark = benchmark
         self.reset_count = 0
         self.step_count = 0
         self.running = True
@@ -88,7 +103,8 @@ class Mupen64PlusEnv(gym.Env):
             self.xvfb_process, self.emulator_process = \
                 self._start_emulator(rom_name=self.config['ROM_NAME'],
                                      gfx_plugin=self.config['GFX_PLUGIN'],
-                                     input_driver_path=self.config['INPUT_DRIVER_PATH'])
+                                     input_driver_path=self.config['INPUT_DRIVER_PATH'],
+                                     res_w=SCR_W, res_h=SCR_H, res_d=SCR_D)
 
         # TODO: Test and cleanup:
         # May need to initialize this after the DISPLAY env var has been set
@@ -171,9 +187,12 @@ class Mupen64PlusEnv(gym.Env):
 
     def _act(self, action, count=1):
         # print("got action:", action, "count:", count)
-        for _ in itertools.repeat(None, count):
+        if not self.controller_server.frame_skip_enabled:
+            for _ in itertools.repeat(None, count):
+                self.controller_server.send_controls(ControllerState(action))
             # print("sending...")
-            self.controller_server.send_controls(ControllerState(action))
+        else:
+            self.controller_server.send_controls(ControllerState(action), count=count)
         # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
@@ -301,9 +320,19 @@ class Mupen64PlusEnv(gym.Env):
             msg = "Input driver not found: " + input_driver_path
             cprint(msg, 'red')
             raise Exception(msg)
+        
+        print("got COUNTPEROP", COUNTPEROP)
+        benchmark_options = [
+                "--nospeedlimit",
+                "--set", f"Core[CountPerOp]={COUNTPEROP}",
+                # "--set", "Video-Rice[ScreenUpdateSetting]=3",
+                # "--set", "Video-Rice[FastTextureLoading]=1",
+                # "--set", "Video-Rice[TextureQuality]=2",
+                # "--set", "Video-Rice[ColorQuality]=1",
+        ]
 
         cmd = [self.config['MUPEN_CMD'],
-               "--nospeedlimit",
+                # "--nospeedlimit",
                "--nosaveoptions",
                "--resolution",
                "%ix%i" % (res_w, res_h),
@@ -311,6 +340,9 @@ class Mupen64PlusEnv(gym.Env):
                "--audio", "dummy",
                "--input", input_driver_path,
                rom_path]
+        
+        if self.benchmark:
+            cmd = [cmd[0]] + benchmark_options + cmd[1:]
 
         xvfb_proc = None
         if self.config['USE_XVFB']:
@@ -454,16 +486,13 @@ class ControllerUpdater(object):
         self.frame_skip = frame_skip
         self.frame_skip_enabled = True
 
-    def send_controls(self, controls):
+    def send_controls(self, controls, count=None):
         if not self.running:
             return
         self.controls = controls
         msg = self.controls.to_msg()
-        msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
-        # msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
-        # print("sending", msg)
-        # if not self.socket.connected
-        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        frame_skip = count if count is not None else self.frame_skip
+        msg += f"|{frame_skip if self.frame_skip_enabled else 0}#"
         
         # print("one")
         try:

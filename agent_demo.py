@@ -1,10 +1,18 @@
 #!/bin/python
 import time
 import gym, gym_mupen64plus
-from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
+from gym_mupen64plus.envs.mupen64plus_env import COUNTPEROP
 
+<<<<<<< HEAD
 render = False
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
+=======
+env = gym.make('Mario-Kart-Luigi-Raceway-v0')
+# for k in range(20):
+# COUNTPEROP = k
+
+render = False
+>>>>>>> faster-emulator-interaction
 env.reset()
 if render:
     env.render()
@@ -17,12 +25,13 @@ for i in range(100):
 
 print("GO! ...drive straight as fast as possible...")
 start = time.time()
-for i in range(100):
+for i in range(1000):
     (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
     if render:
         env.render()
 end = time.time()
-print(end - start, " seconds per 100 steps")
+print(1000 / (end - start), "frames per second, total:", (end-start), "seconds")
+print(end - start, " seconds per 1000 steps")
 
 # print("Doughnuts!!")
 # for i in range(10000):
@@ -32,7 +41,7 @@ print(end - start, " seconds per 100 steps")
 #     (obs, rew, end, info) = env.step([-80, 0, 0, 0, 0]) # Hard-left doughnuts!#
 #     env.render()
 
-input("Press <enter> to exit... ")
+# input("Press <enter> to exit... ")
 
 env.close()
 

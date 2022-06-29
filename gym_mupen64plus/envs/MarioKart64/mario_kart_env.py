@@ -38,6 +38,10 @@ class MarioKartEnv(Mupen64PlusEnv):
     MAP_CHOICE = 0
 
     ENABLE_CHECKPOINTS = False
+    
+    CHECKPOINTS_160 = [16, 9, 146, 111]
+    CHECKPOINTS_320 = [32, 18, 292, 222]
+    CHECKPOINTS_640 = [64, 36, 584, 444]
 
     def __init__(self, character='mario', course='LuigiRaceway'):
         self._set_character(character)
@@ -90,7 +94,15 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.step_count_at_lap = 0
         self.last_known_lap = -1
 
-        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
+        checkpoints = []
+        if self.res_w == 160:
+            checkpoints = self.CHECKPOINTS_320
+        if self.res_w == 320:
+            checkpoints = self.CHECKPOINTS_320
+        if self.res_w == 640:
+            checkpoints = self.CHECKPOINTS_320
+        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*checkpoints)) 
+        # self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
         if self.ENABLE_CHECKPOINTS:
             self._checkpoint_tracker = [[False for i in range(len(self.CHECKPOINT_LOCATIONS))] for j in range(3)]
             self.last_known_ckpt = -1
@@ -247,7 +259,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     def _evaluate_end_state(self):
         #cprint('Evaluate End State called!','yellow')
-        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51)
+        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
+        # return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')
