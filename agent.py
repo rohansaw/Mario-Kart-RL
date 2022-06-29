@@ -7,8 +7,6 @@ from critic import SimpleCritic
 import gym, gym_mupen64plus
 from threading import Thread
 from multiprocessing import Process
-import argparse
-import logging
 from src.utils import set_logging
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
 from torchvision import transforms
