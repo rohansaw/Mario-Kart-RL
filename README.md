@@ -10,3 +10,5 @@
 
 However, this currently gives no access to bash out, if you want to see the program output run `docker run -it --name <image_name> -p 5900 --mount source="$(pwd)/gym_mupen64plus/ROMs",target=/src/gym-mupen64plus/gym_mupen64plus/ROMs,type=bind <image_name>:<tag_name> python gym-mupen64plus/agent.py`
 
+## Using stable baselines agent
+Follow SB installation instructions (here)[https://stable-baselines.readthedocs.io/en/master/guide/install.html]
