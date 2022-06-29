@@ -12,6 +12,7 @@ DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
 # mupen64plus will be installed in /usr/games; add to the $PATH
 PATH=$PATH:/usr/games \
 # Set default DISPLAY
+VIRTUALGL_VERSION=2.5.2
 DISPLAY=:0
 
 # install required packages
@@ -28,33 +29,32 @@ sudo apt-get install -y \
         ffmpeg \
         libjpeg-dev libtiff-dev libgtk2.0-dev \
         libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
-        libjson-c-dev \
+        libjson-c-dev  &&
 
 # # clone, build, and install the input bot
 # # (explicitly specifying commit hash to attempt to guarantee behavior within this container)
-sudo rm -fr install
-mkdir install
-cd install
+sudo rm -fr install &&
+mkdir install &&
+cd install &&
 git clone https://github.com/mupen64plus/mupen64plus-core.git && \
     cd mupen64plus-core && \
     git reset --hard 12d136dd9a54e8b895026a104db7c076609d11ff && \
 cd .. && \
-git clone -b reverts git@github.com:Snagnar/mupen64plus-input-bot.git && \
+git clone git@github.com:Snagnar/mupen64plus-input-bot.git && \
 # git clone https://github.com/snagnar/mupen64plus-input-bot && \
     cd mupen64plus-input-bot && \
-sudo make all && \
-sudo make install
-cd ..
+make all && \
+sudo make install &&
+cd .. &&
 
 # # Install VirtualGL (provides vglrun to allow us to run the emulator in XVFB)
 # # (Check for new releases here: https://github.com/VirtualGL/virtualgl/releases)
-VIRTUALGL_VERSION=2.5.2
 wget "https://sourceforge.net/projects/virtualgl/files/${VIRTUALGL_VERSION}/virtualgl_${VIRTUALGL_VERSION}_amd64.deb" && \
     sudo apt install ./virtualgl_${VIRTUALGL_VERSION}_amd64.deb && \
-    rm virtualgl_${VIRTUALGL_VERSION}_amd64.deb
-cd ..
+    rm virtualgl_${VIRTUALGL_VERSION}_amd64.deb &&
+cd .. &&
 
-sudo apt install virtualenv
-virtualenv venv
-. venv/bin/activate
+sudo apt install virtualenv &&
+virtualenv venv &&
+. venv/bin/activate &&
 pip install -e .

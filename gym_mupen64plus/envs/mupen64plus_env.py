@@ -48,6 +48,8 @@ class ImageHelper:
 ###############################################
 
 # The width, height, and depth of the emulator window:
+# SCR_W = 640
+# SCR_H = 480
 SCR_W = 320
 SCR_H = 240
 SCR_D = 3
@@ -64,8 +66,13 @@ class Mupen64PlusEnv(gym.Env):
     __metaclass__ = abc.ABCMeta
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
+    def __init__(self, low_res_mode=True, benchmark=True):
+        global SCR_W, SCR_H
+        if not low_res_mode and not benchmark:
+            SCR_W = 640
+            SCR_H = 240
         self.viewer = None
+        self.benchmark = benchmark
         self.reset_count = 0
         self.step_count = 0
         self.running = True
@@ -173,9 +180,12 @@ class Mupen64PlusEnv(gym.Env):
 
     def _act(self, action, count=1):
         # print("got action:", action, "count:", count)
-        for _ in itertools.repeat(None, count):
+        if not self.controller_server.frame_skip_enabled:
+            for _ in itertools.repeat(None, count):
+                self.controller_server.send_controls(ControllerState(action))
             # print("sending...")
-            self.controller_server.send_controls(ControllerState(action))
+        else:
+            self.controller_server.send_controls(ControllerState(action), count=count)
         # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
@@ -303,9 +313,18 @@ class Mupen64PlusEnv(gym.Env):
             msg = "Input driver not found: " + input_driver_path
             cprint(msg, 'red')
             raise Exception(msg)
+        
+        benchmark_options = [
+                "--nospeedlimit",
+                "--set", "Core[CountPerOp]=1",
+                "--set", "Video-Rice[ScreenUpdateSetting]=3",
+                "--set", "Video-Rice[FastTextureLoading]=1",
+                "--set", "Video-Rice[TextureQuality]=2",
+                "--set", "Video-Rice[ColorQuality]=1",
+        ]
 
         cmd = [self.config['MUPEN_CMD'],
-               "--nospeedlimit" if BENCHMARK else "",
+                # "--nospeedlimit",
                "--nosaveoptions",
                "--resolution",
                "%ix%i" % (res_w, res_h),
@@ -313,6 +332,9 @@ class Mupen64PlusEnv(gym.Env):
                "--audio", "dummy",
                "--input", input_driver_path,
                rom_path]
+        
+        if self.benchmark:
+            cmd = [cmd[0]] + benchmark_options + cmd[1:]
 
         xvfb_proc = None
         if self.config['USE_XVFB']:
@@ -456,12 +478,13 @@ class ControllerUpdater(object):
         self.frame_skip = frame_skip
         self.frame_skip_enabled = True
 
-    def send_controls(self, controls):
+    def send_controls(self, controls, count=None):
         if not self.running:
             return
         self.controls = controls
         msg = self.controls.to_msg()
-        msg += f"|{self.frame_skip if self.frame_skip_enabled else 0}#"
+        frame_skip = count if count is not None else self.frame_skip
+        msg += f"|{frame_skip if self.frame_skip_enabled else 0}#"
         
         # print("one")
         try:
