@@ -15,7 +15,7 @@ class SimpleActor(Module):
             nn.Conv2d(128, 256, kernel_size=4, padding=0, stride=2),
             nn.ReLU(), # max(0, x)
             nn.Flatten(),
-            nn.Linear(272384, 512),
+            nn.Linear(59904, 512),
             # nn.Linear(4 * input_size[0] * input_size[1], 512),
             nn.ReLU(), # max(0, x)
             nn.Linear(512, 128),

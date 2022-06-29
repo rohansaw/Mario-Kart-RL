@@ -1,4 +1,5 @@
 from ast import arg
+from select import epoll
 import time
 
 import torch
@@ -12,6 +13,7 @@ import logging
 from src.utils import set_logging
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
 from torchvision import transforms
+import wandb
 
 class MarioKartAgent():
     def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000):
@@ -32,11 +34,12 @@ class MarioKartAgent():
         
         self.grafic_transform = transforms.Compose(
             [
-                transforms.Resize((240, 320)),
+                transforms.Resize((120, 160)),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
                 # transforms.Grayscale(),
             ]
         )
+        wandb.init()
         
     
     def step(self, action):
@@ -74,7 +77,7 @@ class MarioKartAgent():
         error = target - self.critic(state)
         return  error
 
-    def train(self, state, next_state, action_prob, observed_reward):
+    def train(self, state, next_state, action_prob, observed_reward, step, episode):
         advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
         # Critic loss is basically MSE, since advantage is the error we square it
         critic_loss = advantage.pow(2)
@@ -85,6 +88,7 @@ class MarioKartAgent():
         actor_loss.backward()
         self.actor_optimizer.step()
         print(critic_loss.item(), actor_loss.item())
+        wandb.log({"critic": critic_loss.item(), "actor": actor_loss.item(), "step": step, "episode": episode}, step=step)
 
     def reset(self):
         obs = self.env.reset()
@@ -106,9 +110,11 @@ class MarioKartAgent():
             for t in range(1,self.max_steps):
                 action, action_prob = self.select_action(state)
                 # ToDo maybe? Do we need some kind of mapping to correct controller actions form onehot encoded action
+                start = time.time()
                 next_state, observed_reward, terminated, info = self.step(action)
+                print("step time:", time.time() - start)
                 self.train(state=state, next_state=next_state,
-                           action_prob=action_prob, observed_reward=observed_reward)
+                           action_prob=action_prob, observed_reward=observed_reward, step=t, episode=episode_num)
 
                 episode_reward += observed_reward
                 state = next_state

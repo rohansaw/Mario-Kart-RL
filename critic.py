@@ -12,7 +12,7 @@ class SimpleCritic(Module):
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(9830400, 64),
+            nn.Linear(2457600, 64),
             # nn.Linear(128 * input_size[0] * input_size[1], 64),
             nn.ReLU(), # max(0, x)
             nn.Linear(64, 1),
