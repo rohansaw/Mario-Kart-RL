@@ -1,4 +1,5 @@
 from ast import arg
+from select import epoll
 import time
 
 import torch
@@ -10,6 +11,7 @@ from multiprocessing import Process
 from src.utils import set_logging
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
 from torchvision import transforms
+import wandb
 
 class MarioKartAgent():
     def __init__(self, graphic_output=True):
@@ -28,11 +30,12 @@ class MarioKartAgent():
         
         self.grafic_transform = transforms.Compose(
             [
-                transforms.Resize((240, 320)),
+                transforms.Resize((120, 160)),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
                 # transforms.Grayscale(),
             ]
         )
+        wandb.init()
         
     def step(self, action):
         obs, rew, end, info = self.env.step(action)
@@ -69,7 +72,7 @@ class MarioKartAgent():
         error = target - self.critic(state)
         return  error
 
-    def train(self, state, next_state, action_prob, observed_reward):
+    def train(self, state, next_state, action_prob, observed_reward, step, episode):
         advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
         # Critic loss is basically MSE, since advantage is the error we square it
         critic_loss = advantage.pow(2)
@@ -80,6 +83,7 @@ class MarioKartAgent():
         actor_loss.backward()
         self.actor_optimizer.step()
         print(critic_loss.item(), actor_loss.item())
+        wandb.log({"critic": critic_loss.item(), "actor": actor_loss.item(), "step": step, "episode": episode}, step=step)
 
     def reset(self):
         obs = self.env.reset()

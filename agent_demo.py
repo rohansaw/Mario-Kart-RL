@@ -3,11 +3,8 @@ import time
 import gym, gym_mupen64plus
 from gym_mupen64plus.envs.mupen64plus_env import COUNTPEROP
 
+render = True
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
-# for k in range(20):
-# COUNTPEROP = k
-
-render = False
 env.reset()
 if render:
     env.render()
