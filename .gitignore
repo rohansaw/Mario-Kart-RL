@@ -3,3 +3,6 @@
 
 # install/
 log.log
+
+wandb
+venv
