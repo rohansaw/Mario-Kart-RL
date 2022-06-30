@@ -16,7 +16,7 @@ from torchvision import transforms
 import wandb
 
 class MarioKartAgent():
-    def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000):
+    def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000, use_wandb=True):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
         self.actor = SimpleActor(input_size=self.env.observation_space.shape,
                                  output_size=self.env.action_space.n)
@@ -39,7 +39,7 @@ class MarioKartAgent():
                 # transforms.Grayscale(),
             ]
         )
-        wandb.init(config={"actor_lr": self.alpha, "critic_lr": self.beta, "discount_factor": self.gamma, "episodes": self.num_episodes})
+        wandb.init(config={"actor_lr": self.alpha, "critic_lr": self.beta, "discount_factor": self.gamma, "episodes": self.num_episodes}, mode="online" if use_wandb else "disabled")
         
     
     def step(self, action):
@@ -129,7 +129,7 @@ class MarioKartAgent():
 
 def main(args):
     set_logging(args.log_file, args.log_level, not args.stop_log_stdout)
-    agent = MarioKartAgent(args.graphic_output)
+    agent = MarioKartAgent(args.graphic_output, use_wandb=not args.no_wandb)
     agent.run()
 
 if __name__ == "__main__":
@@ -144,6 +144,7 @@ if __name__ == "__main__":
                      "printed to both the log file and stdout")
     parser.add_argument("--graphic-output", action="store_true", default=False,
                         help="toggles weather the graphical output of Mario Kart should be rendered")
+    parser.add_argument("--no-wandb", action="store_true", help="Do not publish results to wandb") #we can also change this to activate it with the command
 
     args = parser.parse_args()
     main(args)
