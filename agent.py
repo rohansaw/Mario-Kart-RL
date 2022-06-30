@@ -39,7 +39,7 @@ class MarioKartAgent():
                 # transforms.Grayscale(),
             ]
         )
-        wandb.init()
+        wandb.init(config={"actor_lr": self.alpha, "critic_lr": self.beta, "discount_factor": self.gamma, "episodes": self.num_episodes})
         
     
     def step(self, action):
