@@ -15,5 +15,5 @@ obs = env.reset()
 while True:
     action, _states = model.predict(obs)
     obs, rewards, dones, info = env.step(action)
-    print(rewards)
-    #env.render()
+    #print(rewards)
+    env.render()

@@ -124,7 +124,7 @@ class Mupen64PlusEnv(gym.Env):
             self._navigate_menu()
 
         self.observation_space = \
-            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, SCR_D))
+            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, SCR_D), dtype=np.uint8)
 
         actions = [[-80, 80], # Joystick X-axis
                                                   [-80, 80], # Joystick Y-axis
