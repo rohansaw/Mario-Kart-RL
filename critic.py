@@ -7,12 +7,12 @@ class SimpleCritic(Module):
         
         num_channels = input_size[2]
         self.model = nn.Sequential(
-            nn.Conv2d(num_channels, 64, kernel_size=3, padding=1),
+            nn.Conv2d(num_channels, 16, kernel_size=4, stride=2, padding=1),
             nn.ReLU(), # max(0, x)
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(2457600, 64),
+            nn.Linear((input_size[0] * input_size[1] * 2), 64),
             # nn.Linear(128 * input_size[0] * input_size[1], 64),
             nn.ReLU(), # max(0, x)
             nn.Linear(64, 1),

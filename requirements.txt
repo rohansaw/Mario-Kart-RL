@@ -4,4 +4,6 @@ PyYAML
 termcolor
 mss
 torch
-torchvision                        
+torchvision
+bitorch
+wandb

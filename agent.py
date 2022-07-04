@@ -10,17 +10,20 @@ from threading import Thread
 from multiprocessing import Process
 import argparse
 import logging
-from src.utils import set_logging
+from src.utils import set_logging, TimeMeasurement
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
 from torchvision import transforms
+
 import wandb
+
 
 class MarioKartAgent():
     def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000, use_wandb=True):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-        self.actor = SimpleActor(input_size=self.env.observation_space.shape,
+        input_size = (60, 80, 3)
+        self.actor = SimpleActor(input_size=input_size,
                                  output_size=self.env.action_space.n)
-        self.critic = SimpleCritic(input_size=self.env.observation_space.shape)
+        self.critic = SimpleCritic(input_size=input_size)
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.alpha = 0.01 # actor lr
@@ -30,11 +33,14 @@ class MarioKartAgent():
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.alpha)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.beta)
         
+        self.critic_loss = torch.nn.MSELoss()
+        # self.critic_loss = MSE()
+
         self.graphic_output = graphic_output
         
         self.grafic_transform = transforms.Compose(
             [
-                transforms.Resize((120, 160)),
+                transforms.Resize(input_size[:2]),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
                 # transforms.Grayscale(),
             ]
@@ -51,6 +57,7 @@ class MarioKartAgent():
     def _transform_state(self, state):
         state = torch.from_numpy(state.copy()).to(self.device).to(torch.float32)
         state = torch.movedim(state, 2, 0).unsqueeze(0)
+        print(state.shape)
         return self.grafic_transform(state)
     
     def select_action(self, state):
@@ -80,16 +87,18 @@ class MarioKartAgent():
         return  error
 
     def train(self, state, next_state, action_prob, observed_reward, step, episode):
-        
-        advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
+        with TimeMeasurement("advantage"):
+            advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
         # Critic loss is basically MSE, since advantage is the error we square it
-        critic_loss = advantage.pow(2)
-        critic_loss.backward()
-        self.critic_optimizer.step()
+        with TimeMeasurement("critic step"):
+            critic_loss = advantage.pow(2)
+            critic_loss.backward()
+            self.critic_optimizer.step()
 
-        actor_loss = -action_prob*advantage.detach()
-        actor_loss.backward()
-        self.actor_optimizer.step()
+        with TimeMeasurement("actor step"):
+            actor_loss = -action_prob*advantage.detach()
+            actor_loss.backward()
+            self.actor_optimizer.step()
         print(critic_loss.item(), actor_loss.item())
         wandb.log({"critic": critic_loss.item(), "actor": actor_loss.item(), "step": step, "episode": episode}, step=step)
 
@@ -140,7 +149,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("RL Agent for Mario Kart for N64 Emulator")
-    parser.add_argument("--log-level", type=str, default="info",
+    parser.add_argument("--log-level", type=str, default="debug",
                      choices=["debug", "info", "warning", "error", "critical"],
                      help="log level for logging message output")
     parser.add_argument("--log-file", type=str, default="log.log",

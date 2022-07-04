@@ -23,7 +23,7 @@ class SimpleActor(Module):
             ShapePrintDebug(debug_interval=1, name="3"),
             nn.ReLU(), # max(0, x)
             nn.Flatten(),
-            nn.Linear((input_size[0] * input_size[1] * 4), 512),
+            nn.Linear(((input_size[0] // 8) * (input_size[1] // 8) * 256), 512),
             # nn.Linear(4 * input_size[0] * input_size[1], 512),
             nn.ReLU(), # max(0, x)
             nn.Linear(512, 128),
