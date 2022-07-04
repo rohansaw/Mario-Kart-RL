@@ -1,21 +1,29 @@
 from torch.nn import Module
 import torch.nn as nn
 import torch
+from bitorch.layers import ShapePrintDebug
+
+from bitorch.layers.config import config
 
 class SimpleActor(Module):
     def __init__(self, input_size, output_size):
         super(SimpleActor, self).__init__()
         
+        print("input size:", input_size)
         num_channels = input_size[2]
         self.model = nn.Sequential(
-            nn.Conv2d(num_channels, 64, kernel_size=4, padding=0, stride=2),
+            ShapePrintDebug(debug_interval=1, name="input"),
+            nn.Conv2d(num_channels, 64, kernel_size=4, padding=1, stride=2),
+            ShapePrintDebug(debug_interval=1, name="1"),
             nn.ReLU(), # max(0, x)
-            nn.Conv2d(64, 128, kernel_size=4, padding=0, stride=2),
+            nn.Conv2d(64, 128, kernel_size=4, padding=1, stride=2),
+            ShapePrintDebug(debug_interval=1, name="2"),
             nn.ReLU(), # max(0, x)
-            nn.Conv2d(128, 256, kernel_size=4, padding=0, stride=2),
+            nn.Conv2d(128, 256, kernel_size=4, padding=1, stride=2),
+            ShapePrintDebug(debug_interval=1, name="3"),
             nn.ReLU(), # max(0, x)
             nn.Flatten(),
-            nn.Linear(59904, 512),
+            nn.Linear((input_size[0] * input_size[1] * 4), 512),
             # nn.Linear(4 * input_size[0] * input_size[1], 512),
             nn.ReLU(), # max(0, x)
             nn.Linear(512, 128),
@@ -23,9 +31,11 @@ class SimpleActor(Module):
             nn.Linear(128, output_size),
             nn.Softmax(),
         )
+        print("first linear layer:", (input_size[0] * input_size[1]))
 
     def forward(self, x):
         # print(x)
+        config.debug_activated = True
         return self.model(x) # num actions x 1 
 
 # ToDo, not working yet

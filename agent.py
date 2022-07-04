@@ -39,6 +39,7 @@ class MarioKartAgent():
                 # transforms.Grayscale(),
             ]
         )
+        self.device = "cpu"
         wandb.init(config={"actor_lr": self.alpha, "critic_lr": self.beta, "discount_factor": self.gamma, "episodes": self.num_episodes}, mode="online" if use_wandb else "disabled")
         
     
@@ -48,8 +49,9 @@ class MarioKartAgent():
         return obs, rew, end, info
     
     def _transform_state(self, state):
-        state = torch.movedim(torch.from_numpy(state.copy()).to(torch.float32), 2, 0).unsqueeze(0)
-        return self.grafic_transform(state).to(torch.float32)
+        state = torch.from_numpy(state.copy()).to(self.device).to(torch.float32)
+        state = torch.movedim(state, 2, 0).unsqueeze(0)
+        return self.grafic_transform(state)
     
     def select_action(self, state):
         '''Returns one-hot encoded action to play next and log_prob of this action in the distribution'''
@@ -78,6 +80,7 @@ class MarioKartAgent():
         return  error
 
     def train(self, state, next_state, action_prob, observed_reward, step, episode):
+        
         advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
         # Critic loss is basically MSE, since advantage is the error we square it
         critic_loss = advantage.pow(2)
@@ -95,8 +98,11 @@ class MarioKartAgent():
         self.conditional_render()
         return obs
 
-    def run(self):
+    def run(self, device="cpu"):
         rewards = [] # Rewards of all episodes
+        self.device = device
+        self.actor = self.actor.to(device)
+        self.critic = self.critic.to(device)
         for episode_num in range(1, self.num_episodes):
             state = self.reset()
             episode_reward = 0
@@ -139,6 +145,8 @@ if __name__ == "__main__":
                      help="log level for logging message output")
     parser.add_argument("--log-file", type=str, default="log.log",
                      help="output file path for logging. default to stdout")
+    parser.add_argument("--device", type=str, default="cpu",
+                     help="device to train on. choose from 'cpu' and 'cuda:0'")
     parser.add_argument("--stop-log-stdout", action="store_false", default=True,
                      help="toggles force logging to stdout. if a log file is specified, logging will be "
                      "printed to both the log file and stdout")
