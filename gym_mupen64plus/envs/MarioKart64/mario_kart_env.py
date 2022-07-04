@@ -38,6 +38,10 @@ class MarioKartEnv(Mupen64PlusEnv):
     MAP_CHOICE = 0
 
     ENABLE_CHECKPOINTS = False
+    
+    CHECKPOINTS_160 = [16, 9, 146, 111]
+    CHECKPOINTS_320 = [32, 18, 292, 222]
+    CHECKPOINTS_640 = [64, 36, 584, 444]
 
     def __init__(self, character='mario', course='LuigiRaceway'):
         self._set_character(character)
@@ -45,12 +49,14 @@ class MarioKartEnv(Mupen64PlusEnv):
         super(MarioKartEnv, self).__init__()
 
         self.end_race_pixel_color = self.END_RACE_PIXEL_COLORS[self.config["GFX_PLUGIN"]]
-        
-        self.action_space = spaces.MultiDiscrete([[-80, 80],  # Joystick X-axis
+
+        actions = [[-80, 80],  # Joystick X-axis
                                                   [-80, 80],  # Joystick Y-axis
                                                   [  0,  1],  # A Button
                                                   [  0,  1],  # B Button
-                                                  [  0,  1]]) # RB Button
+                                                  [  0,  1]]
+        
+        self.action_space = spaces.MultiDiscrete([len(action) for action in actions]) # RB Button
 
     def _load_config(self):
         self.config.update(yaml.safe_load(open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "mario_kart_config.yml"))))
@@ -85,12 +91,19 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=76, wait_for='race to load')
 
     def _reset(self):
-        
         self.lap = 1
         self.step_count_at_lap = 0
         self.last_known_lap = -1
 
-        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
+        checkpoints = []
+        if self.res_w == 160:
+            checkpoints = self.CHECKPOINTS_320
+        if self.res_w == 320:
+            checkpoints = self.CHECKPOINTS_320
+        if self.res_w == 640:
+            checkpoints = self.CHECKPOINTS_320
+        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*checkpoints)) 
+        # self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
         if self.ENABLE_CHECKPOINTS:
             self._checkpoint_tracker = [[False for i in range(len(self.CHECKPOINT_LOCATIONS))] for j in range(3)]
             self.last_known_ckpt = -1
@@ -168,29 +181,29 @@ class MarioKartEnv(Mupen64PlusEnv):
         # likelihood of a pixel matching the color by chance
 
         # Top
-        for i in range((max_x - min_x) // 2):
-            x_val = min_x + i*2
+        for i in range((max_x - min_x) // 4):
+            x_val = min_x + i*4
             y_val = min_y
             yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
 
         # Right-side
-        for i in range((max_y - min_y) // 2):
+        for i in range((max_y - min_y) // 4):
             x_val = max_x
-            y_val = min_y + i*2
+            y_val = min_y + i*4
             yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Bottom
-        for i in range((max_x - min_x) // 2):
+        for i in range((max_x - min_x) // 4):
             if i == 0: # Skip the bottom right corner (for some reason MK doesn't draw it)
                 continue
-            x_val = max_x - i*2
+            x_val = max_x - i*4
             y_val = max_y
             yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Left-side
-        for i in range((max_y - min_y) // 2):
+        for i in range((max_y - min_y) // 4):
             x_val = min_x
-            y_val = max_y - i*2
+            y_val = max_y - i*4
             yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
 
     def _get_current_checkpoint(self):
@@ -247,7 +260,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     def _evaluate_end_state(self):
         #cprint('Evaluate End State called!','yellow')
-        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51)
+        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
+        # return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')

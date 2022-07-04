@@ -1,2 +1,9 @@
 *.pyc
 *.egg-info/
+
+# install/
+log.log
+
+wandb
+venv
+__pycache__
