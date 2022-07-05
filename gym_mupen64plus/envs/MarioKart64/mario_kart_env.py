@@ -120,6 +120,9 @@ class MarioKartEnv(Mupen64PlusEnv):
 
         return super(MarioKartEnv, self)._reset()
 
+    def reset(self):
+        return self._reset()
+
     def _get_reward(self):
         #cprint('Get Reward called!','yellow')
 
