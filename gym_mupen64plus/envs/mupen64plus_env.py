@@ -420,8 +420,8 @@ class Mupen64PlusEnv(gym.Env):
     def step(self, action):
         return self._step(action)
 
-    def render(self):
-        return self._render()
+    def render(self, mode):
+        return self._render(mode)
 
 
 ###############################################
