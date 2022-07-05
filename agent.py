@@ -1,3 +1,4 @@
+from tqdm import tqdm
 from ast import arg
 from select import epoll
 import time
@@ -20,7 +21,8 @@ import wandb
 class MarioKartAgent():
     def __init__(self, graphic_output=True, num_episodes=400, max_steps=10000, use_wandb=True):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-        input_size = (60, 80, 3)
+        input_size = (30, 40, 3)
+        # input_size = (60, 80, 3)
         self.actor = SimpleActor(input_size=input_size,
                                  output_size=self.env.action_space.n)
         self.critic = SimpleCritic(input_size=input_size)
@@ -41,8 +43,6 @@ class MarioKartAgent():
         self.grafic_transform = transforms.Compose(
             [
                 transforms.Resize(input_size[:2]),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-                # transforms.Grayscale(),
             ]
         )
         self.device = "cpu"
@@ -57,7 +57,7 @@ class MarioKartAgent():
     def _transform_state(self, state):
         state = torch.from_numpy(state.copy()).to(self.device).to(torch.float32)
         state = torch.movedim(state, 2, 0).unsqueeze(0)
-        print(state.shape)
+        state = (state - 128.0) / 128.0 # state now is in range [-1, 1]
         return self.grafic_transform(state)
     
     def select_action(self, state):
@@ -65,6 +65,7 @@ class MarioKartAgent():
         # print("forwarding: ", state.shape, state)
         state = self._transform_state(state)
         probs = self.actor(state)
+        print("probs:", probs)
         
         # Use a categorical policy to sample the action that should be played next
         prob_dist = torch.distributions.Categorical(probs)
@@ -87,6 +88,8 @@ class MarioKartAgent():
         return  error
 
     def train(self, state, next_state, action_prob, observed_reward, step, episode):
+        self.critic_optimizer.zero_grad()
+        self.actor_optimizer.zero_grad()
         with TimeMeasurement("advantage"):
             advantage = self._compute_advantage(observed_reward=observed_reward, state=state, next_state=next_state)
         # Critic loss is basically MSE, since advantage is the error we square it
@@ -97,9 +100,11 @@ class MarioKartAgent():
 
         with TimeMeasurement("actor step"):
             actor_loss = -action_prob*advantage.detach()
+            print("actor loss:", actor_loss)
             actor_loss.backward()
+            print(self.actor.model[0].weight.grad)
             self.actor_optimizer.step()
-        print(critic_loss.item(), actor_loss.item())
+        logging.debug(critic_loss.item(), actor_loss.item())
         wandb.log({"critic": critic_loss.item(), "actor": actor_loss.item(), "step": step, "episode": episode}, step=step)
 
     def reset(self):
@@ -122,17 +127,19 @@ class MarioKartAgent():
                 self.conditional_render()
 
             logging.info("phase 2") # Train actor and critic networks
-            for t in range(1,self.max_steps):
+            for t in tqdm(range(1,self.max_steps)):
                 action, action_prob = self.select_action(state)
+                print("taking action:", DiscreteActions.ACTION_MAP[action], "idx:", action)
                 # ToDo maybe? Do we need some kind of mapping to correct controller actions form onehot encoded action
                 start = time.time()
                 next_state, observed_reward, terminated, info = self.step(action)
-                print("step time:", time.time() - start)
+                # print("step time:", time.time() - start)
                 self.train(state=state, next_state=next_state,
                            action_prob=action_prob, observed_reward=observed_reward, step=t, episode=episode_num)
 
                 episode_reward += observed_reward
                 state = next_state
+                time.sleep(1)
                 if terminated:
                     logging.info(f'Episode {episode_num} finished with reward: {episode_reward}')
                     rewards.append(episode_reward)
@@ -145,11 +152,11 @@ class MarioKartAgent():
 def main(args):
     set_logging(args.log_file, args.log_level, not args.stop_log_stdout)
     agent = MarioKartAgent(args.graphic_output, use_wandb=not args.no_wandb)
-    agent.run()
+    agent.run(args.device)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("RL Agent for Mario Kart for N64 Emulator")
-    parser.add_argument("--log-level", type=str, default="debug",
+    parser.add_argument("--log-level", type=str, default="info",
                      choices=["debug", "info", "warning", "error", "critical"],
                      help="log level for logging message output")
     parser.add_argument("--log-file", type=str, default="log.log",

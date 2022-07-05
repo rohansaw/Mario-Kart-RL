@@ -266,14 +266,16 @@ class MarioKartEnv(Mupen64PlusEnv):
         return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
     def _evaluate_end_state(self):
-        #cprint('Evaluate End State called!','yellow')
+        # cprint('Evaluate End State called!','yellow')
         if self.res_w == 160:
-            # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12))
+            if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12):
+                print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12))
             return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12)
         if self.res_w == 320:
-            # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25))
+            if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25):
+                print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25))
             return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
-        # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51))
+        print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51))
         return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
 
     def _navigate_menu(self):
