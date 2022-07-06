@@ -37,7 +37,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     MAP_SERIES = 0
     MAP_CHOICE = 0
 
-    ENABLE_CHECKPOINTS = False
+    ENABLE_CHECKPOINTS = True
     
     CHECKPOINTS_160 = [16, 9, 146, 111]
     CHECKPOINTS_320 = [32, 18, 292, 222]
@@ -180,33 +180,33 @@ class MarioKartEnv(Mupen64PlusEnv):
         # likelihood of a pixel matching the color by chance
 
         # Top
-        for i in range((max_x - min_x) // 4):
-            x_val = min_x + i*4
+        for i in range((max_x - min_x) // 2):
+            x_val = min_x + i*2
             y_val = min_y
             yield [(x_val, y_val), (x_val + 1, y_val)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
 
         # Right-side
-        for i in range((max_y - min_y) // 4):
+        for i in range((max_y - min_y) // 2):
             x_val = max_x
-            y_val = min_y + i*4
+            y_val = min_y + i*2
             yield [(x_val, y_val), (x_val, y_val + 1)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Bottom
-        for i in range((max_x - min_x) // 4):
+        for i in range((max_x - min_x) // 2):
             if i == 0: # Skip the bottom right corner (for some reason MK doesn't draw it)
                 continue
-            x_val = max_x - i*4
+            x_val = max_x - i*2
             y_val = max_y
             yield [(x_val, y_val), (x_val - 1, y_val)]
             # yield [(x_val, y_val)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Left-side
-        for i in range((max_y - min_y) // 4):
+        for i in range((max_y - min_y) // 2):
             x_val = min_x
-            y_val = max_y - i*4
+            y_val = max_y - i*2
             # yield [(x_val, y_val)]
             yield [(x_val, y_val), (x_val, y_val - 1)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]

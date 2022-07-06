@@ -184,6 +184,7 @@ class Mupen64PlusEnv(gym.Env):
         # print("_get_reward time:", end - start)
 
         self.step_count += 1
+        # if self.episode_over:
         return obs, reward, self.episode_over, {}
 
     def _act(self, action, count=1):

@@ -11,16 +11,17 @@ class SimpleActor(Module):
         
         print("input size:", input_size)
         num_channels = input_size[2]
-        self.model = nn.Sequential(
+        self.convolution = nn.Sequential(
             # InputPrintDebug(debug_interval=1, num_outputs=1),
-            # ShapePrintDebug(debug_interval=1, name="input"),
-            nn.Conv2d(num_channels, 64, kernel_size=4, padding=1, stride=2),
+            ShapePrintDebug(debug_interval=1, name="input"),
+            nn.Conv2d(num_channels, 32, kernel_size=4, padding=1, stride=2),
             # WeightPrintDebug(module=nn.Conv2d(num_channels, 64, kernel_size=4, padding=1, stride=2), name="weight 1", debug_interval=1),
             # ShapePrintDebug(debug_interval=1, name="1"),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="1"),
             nn.ReLU(), # max(0, x)
             # nn.BatchNorm2d(64),
-            WeightPrintDebug(module=nn.Conv2d(64, 128, kernel_size=4, padding=1, stride=2), name="weight 2", debug_interval=1),
+            nn.Conv2d(32, 64, kernel_size=4, padding=1, stride=2),
+            # WeightPrintDebug(module=nn.Conv2d(64, 128, kernel_size=4, padding=1, stride=2), name="weight 2", debug_interval=1),
             # ShapePrintDebug(debug_interval=1, name="2"),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="2"),
             nn.ReLU(), # max(0, x)
@@ -30,18 +31,23 @@ class SimpleActor(Module):
             # nn.ReLU(), # max(0, x)
             # nn.BatchNorm2d(256),
             nn.Flatten(),
+        )
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="4"),
-            nn.Linear(((input_size[0] // 4) * (input_size[1] // 4) * 128), 512),
+        self.lstm1 = nn.LSTM(input_size=4480, hidden_size=64)
+            # nn.Linear(((input_size[0] // 4) * (input_size[1] // 4) * 128), 512),
             # nn.Linear(((input_size[0] // 8) * (input_size[1] // 8) * 256), 512),
             # nn.Linear(4 * input_size[0] * input_size[1], 512),
+        self.classifier = nn.Sequential (
             nn.ReLU(), # max(0, x)
             # nn.BatchNorm2d(512),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="5"),
             # nn.Linear(512, 128),
             # nn.Sigmoid(), # max(0, x)
             # nn.BatchNorm2d(128),
-            InputPrintDebug(debug_interval=1, num_outputs=1, name="6"),
-            WeightPrintDebug(debug_interval=1, num_outputs=1, module=nn.Linear(512, output_size), name="weight 6"),
+            # InputPrintDebug(debug_interval=1, num_outputs=1, name="6"),
+        # self.lstm2 = nn.LSTM(128, 64),
+            nn.Linear(64, output_size),
+            # WeightPrintDebug(debug_interval=1, num_outputs=1, module=nn.Linear(512, output_size), name="weight 6"),
             # nn.Linear(512, output_size),
             nn.Softmax(),
         )
@@ -68,13 +74,19 @@ class SimpleActor(Module):
         #         nn.Linear(1000, output_size),
         #         nn.Softmax(),
         #     )
-
+        self.hidden = None
         print("first linear layer:", (input_size[0] * input_size[1]))
 
     def forward(self, x):
         # print(x)
-        config.debug_activated = True
-        return self.model(x) # num actions x 1 
+        convoluted = self.convolution(x)
+        output, hidden = self.lstm1(convoluted)
+        # print(output.shape, self.hidden[0].shape)
+        # config.debug_activated = True
+        return self.classifier(hidden[0]) # num actions x 1 
+
+    def reset_model(self):
+        self.hidden = None
 
 # ToDo, not working yet
 class LSTMActor(Module):
