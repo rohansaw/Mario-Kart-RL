@@ -39,6 +39,11 @@ class SimpleCritic(Module):
             # ShapePrintDebug(debug_interval=1, name="1"),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="1"),
             nn.ReLU(), # max(0, x)
+            nn.Conv2d(32, 64, kernel_size=4, padding=1, stride=2),
+            # WeightPrintDebug(module=nn.Conv2d(num_channels, 64, kernel_size=4, padding=1, stride=2), name="weight 1", debug_interval=1),
+            # ShapePrintDebug(debug_interval=1, name="1"),
+            # InputPrintDebug(debug_interval=1, num_outputs=1, name="1"),
+            nn.ReLU(), # max(0, x)
             # nn.Conv2d(128, 256, kernel_size=4, padding=1, stride=2),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="3"),
             # nn.ReLU(), # max(0, x)
@@ -46,7 +51,7 @@ class SimpleCritic(Module):
             nn.Flatten(),
         )
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="4"),
-        self.lstm1 = nn.LSTM(input_size=9600, hidden_size=32)
+        self.lstm1 = nn.LSTM(input_size=19200, hidden_size=512)
             # nn.Linear(((input_size[0] // 4) * (input_size[1] // 4) * 128), 512),
             # nn.Linear(((input_size[0] // 8) * (input_size[1] // 8) * 256), 512),
             # nn.Linear(4 * input_size[0] * input_size[1], 512),
@@ -54,15 +59,15 @@ class SimpleCritic(Module):
             nn.ReLU(), # max(0, x)
             # nn.BatchNorm2d(512),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="5"),
-            # nn.Linear(512, 128),
+            nn.Linear(512, 128),
+            nn.ReLU(), # max(0, x)
             # nn.Sigmoid(), # max(0, x)
             # nn.BatchNorm2d(128),
             # InputPrintDebug(debug_interval=1, num_outputs=1, name="6"),
         # self.lstm2 = nn.LSTM(128, 64),
-            nn.Linear(32, 1),
+            nn.Linear(128, 1),
             # WeightPrintDebug(debug_interval=1, num_outputs=1, module=nn.Linear(512, output_size), name="weight 6"),
             # nn.Linear(512, output_size),
-            nn.Softmax(),
         )
         # self.model = nn.Sequential(
         #         ShapePrintDebug(debug_interval=1, name="1"),

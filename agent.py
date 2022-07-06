@@ -76,10 +76,10 @@ class Context():
 torch.autograd.set_detect_anomaly(True)
 
 class MarioKartAgent():
-    def __init__(self, graphic_output=True, num_episodes=100, max_steps=1150, use_wandb=True, visualize_last=True):
+    def __init__(self, graphic_output=True, num_episodes=5000, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=100):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-        input_size = (30, 40, 3)
-        # input_size = (60, 80, 3)
+        # input_size = (30, 40, 3)
+        input_size = (60, 80, 3)
         self.actor = SimpleActor(input_size=input_size,
                                  output_size=self.env.action_space.n)
         self.critic = SimpleCritic(input_size=input_size)
@@ -87,12 +87,13 @@ class MarioKartAgent():
         self.max_steps = max_steps
         self.alpha = 0.001 # actor lr
         self.beta = 0.001 # critic lr
-        self.gamma = 0.99 # discount factor
+        self.gamma = 0.95 # discount factor
         self.step_size = 16
         self.context_size = 16
         self.warmup_episodes = 0
         
         self.visualize_last_run = visualize_last
+        self.visualize_every = visualize_every
         
         # self.max_steps -= 100
 
@@ -153,7 +154,7 @@ class MarioKartAgent():
         q_vals = torch.zeros((size, 1), device=self.device)
         for i in range(size):
             reward = rewards[size - 1 - i]
-            terminated = terminated[size - 1 - i]
+            terminated = terminates[size - 1 - i]
             q_value = reward + self.gamma * q_value * (1.0 - terminated)
             q_vals[size - 1 - i] = q_value # store values from the end to the beginning
         return q_vals
