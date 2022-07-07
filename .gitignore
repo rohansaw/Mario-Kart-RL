@@ -7,3 +7,4 @@ log.log
 wandb
 venv
 *.pckl
+.vscode
