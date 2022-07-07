@@ -6,3 +6,4 @@ log.log
 
 wandb
 venv
+*.pckl

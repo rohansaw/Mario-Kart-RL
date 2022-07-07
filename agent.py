@@ -1,3 +1,5 @@
+from pathlib import Path
+from copyreg import pickle
 from curses import termname
 import random
 from urllib import request
@@ -76,7 +78,7 @@ class Context():
 torch.autograd.set_detect_anomaly(True)
 
 class MarioKartAgent():
-    def __init__(self, graphic_output=True, num_episodes=5000, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=100):
+    def __init__(self, graphic_output=True, num_episodes=5000, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=10, load_model=False):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
         # input_size = (30, 40, 3)
         input_size = (60, 80, 3)
@@ -92,6 +94,8 @@ class MarioKartAgent():
         self.context_size = 16
         self.warmup_episodes = 0
         
+        self.output_path = Path("models/")
+        
         self.visualize_last_run = visualize_last
         self.visualize_every = visualize_every
         
@@ -99,6 +103,8 @@ class MarioKartAgent():
 
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.alpha)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.beta)
+        if load_model:
+            self.load_model()
         
         self.critic_loss = torch.nn.MSELoss()
         # self.critic_loss = MSE()
@@ -183,6 +189,18 @@ class MarioKartAgent():
         obs = self.env.reset()
         self.conditional_render()
         return obs
+    
+    def store_model(self):
+        self.output_path.mkdir(parents=True, exist_ok=True)
+        # with (self.output_path / "actor.pckl").open() as actor_store_file:
+            # pickle.dump()
+        torch.save(self.actor.state_dict(), self.output_path / "actor.pckl")
+        torch.save(self.critic.state_dict(), self.output_path / "critic.pckl")
+    
+    def load_model(self):
+        self.actor.load_state_dict(torch.load(self.output_path / "actor.pckl"))
+        self.critic.load_state_dict(torch.load(self.output_path / "critic.pckl"))
+
 
     def run(self, device="cpu"):
         all_rewards = [] # Rewards of all episodes
@@ -190,11 +208,17 @@ class MarioKartAgent():
         self.actor = self.actor.to(device)
         self.critic = self.critic.to(device)
         buffer = Memory(4, self.step_size)
+        previous_graphic_output = self.graphic_output
+        
+        best_reward = -1e6
         # wandb.watch(self.actor, log_freq=100)
         # wandb.watch(self.critic, log="all", log_freq=10)
         for episode_num in range(1, self.num_episodes):
             if episode_num == self.num_episodes - 1 and self.visualize_last_run:
+            # if (episode_num % self.visualize_every == 0) or (episode_num == self.num_episodes - 1 and self.visualize_last_run):
                 self.graphic_output = True
+            # else:
+            #     self.grafic_output = False
             state = self.reset()
             buffer.reset()
             episode_reward = 0
@@ -239,6 +263,11 @@ class MarioKartAgent():
                 logging.info(f'Episode {episode_num} finished with reward: {episode_reward}')
                 wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
                 all_rewards.append(episode_reward)
+            
+            if all_rewards[-1] > best_reward:
+                print("storing best model which achieved reward:", all_rewards[-1])
+                self.store_model()
+                best_reward = all_rewards[-1]
             
         # input("press <enter> to exit....")
         # print("visualizing result:")
