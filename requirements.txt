@@ -1,7 +1,10 @@
-gym==0.7.4
+gym==0.21
 numpy
 PyYAML
 termcolor
 mss
 torch
-torchvision                        
+torchvision
+stable-baselines3
+wandb
+tensorboard            

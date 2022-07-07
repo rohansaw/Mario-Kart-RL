@@ -2,14 +2,15 @@ import gym, gym_mupen64plus
 
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_checker import check_env
-
+import wandb
+from wandb.integration.sb3 import WandbCallback
 # Parallel environments
 env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
 check_env(env)
-
+wandb.init(monitor_gym=True)
 model = A2C("CnnPolicy", env, verbose=1)
-model.learn(total_timesteps=100000)
-model.save("models/mk__a2c_cnn_100k_reset_impl")
+model.learn(total_timesteps=10000000, callback=WandbCallback())
+model.save("models/mk__a2c_cnn_1kk_reset_impl")
 #model = A2C.load("models/mk__a2c_cnn_2_no_cp")
 obs = env.reset()
 while True:
