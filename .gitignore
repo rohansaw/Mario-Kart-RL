@@ -7,3 +7,5 @@ log.log
 wandb
 venv
 __pycache__
+*.pckl
+.vscode

@@ -8,3 +8,5 @@ torchvision
 stable-baselines3
 wandb
 tensorboard            
+bitorch
+wandb

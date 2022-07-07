@@ -19,6 +19,7 @@ print("GO! ...drive straight as fast as possible...")
 start = time.time()
 for i in range(1000):
     (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
+    # print("rew:", rew)
     if render:
         env.render()
 end = time.time()

@@ -97,12 +97,12 @@ class MarioKartEnv(Mupen64PlusEnv):
 
         checkpoints = []
         if self.res_w == 160:
-            checkpoints = self.CHECKPOINTS_320
+            checkpoints = self.CHECKPOINTS_160
         if self.res_w == 320:
             checkpoints = self.CHECKPOINTS_320
         if self.res_w == 640:
-            checkpoints = self.CHECKPOINTS_320
-        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*checkpoints)) 
+            checkpoints = self.CHECKPOINTS_640
+        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*checkpoints))
         # self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
         if self.ENABLE_CHECKPOINTS:
             self._checkpoint_tracker = [[False for i in range(len(self.CHECKPOINT_LOCATIONS))] for j in range(3)]
@@ -187,13 +187,15 @@ class MarioKartEnv(Mupen64PlusEnv):
         for i in range((max_x - min_x) // 4):
             x_val = min_x + i*4
             y_val = min_y
-            yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
+            yield [(x_val, y_val), (x_val + 1, y_val)]
+            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
 
         # Right-side
         for i in range((max_y - min_y) // 4):
             x_val = max_x
-            y_val = min_y + i*4
-            yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
+            y_val = min_y + i*2
+            yield [(x_val, y_val), (x_val, y_val + 1)]
+            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Bottom
         for i in range((max_x - min_x) // 4):
@@ -201,13 +203,17 @@ class MarioKartEnv(Mupen64PlusEnv):
                 continue
             x_val = max_x - i*4
             y_val = max_y
-            yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
+            yield [(x_val, y_val), (x_val - 1, y_val)]
+            # yield [(x_val, y_val)]
+            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Left-side
         for i in range((max_y - min_y) // 4):
             x_val = min_x
-            y_val = max_y - i*4
-            yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
+            y_val = max_y - i*2
+            # yield [(x_val, y_val)]
+            yield [(x_val, y_val), (x_val, y_val - 1)]
+            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
 
     def _get_current_checkpoint(self):
         checkpoint_values = [self._evaluate_checkpoint(points)
@@ -248,23 +254,33 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _evaluate_checkpoint(self, checkpoint_points):
         checkpoint_pixels = [IMAGE_HELPER.GetPixelColor(self.pixel_array, point[0], point[1])
                              for point in checkpoint_points]
+        # print("checkpoint values:", checkpoint_pixels)
 
         #print(checkpoint_pixels)
         
         # If the first pixel is not a valid color, no need to check the other three
         if not checkpoint_pixels[0] in self.HUD_PROGRESS_COLOR_VALUES:
             return -1
+        # print("first is in")
         # If the first pixel is good, make sure the other three match
-        elif not self.all_equal(checkpoint_pixels):
+        if not self.all_equal(checkpoint_pixels):
             return -1
+        # print("all equal")
         # If all are good, return the corresponding value
-        else:
-            return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
+        return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
     def _evaluate_end_state(self):
-        #cprint('Evaluate End State called!','yellow')
-        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
-        # return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
+        # cprint('Evaluate End State called!','yellow')
+        if self.res_w == 160:
+            if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12):
+                print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12))
+            return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12)
+        if self.res_w == 320:
+            if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25):
+                print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25))
+            return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
+        print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51))
+        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')

@@ -67,8 +67,9 @@ class Mupen64PlusEnv(gym.Env):
     __metaclass__ = abc.ABCMeta
     metadata = {'render.modes': ['human']}
 
-    # def __init__(self, benchmark=True, res_w=160, res_h=120):
-    def __init__(self, benchmark=True, res_w=320, res_h=240):
+    def __init__(self, benchmark=True, res_w=160, res_h=120):
+    # def __init__(self, benchmark=True, res_w=320, res_h=240):
+    # def __init__(self, benchmark=True, res_w=640, res_h=480):
         global SCR_W, SCR_H
         # if not low_res_mode and not benchmark:
         #     SCR_W = 640
@@ -185,6 +186,7 @@ class Mupen64PlusEnv(gym.Env):
         # print("_get_reward time:", end - start)
 
         self.step_count += 1
+        # if self.episode_over:
         return obs, reward, self.episode_over, {}
 
     def _act(self, action, count=1):
