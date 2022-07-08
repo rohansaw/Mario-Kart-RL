@@ -84,6 +84,8 @@ class Mupen64PlusEnv(gym.Env):
         self.step_count = 0
         self.running = True
         self.episode_over = False
+        self.episode_reward = 0
+        self.last_episode_reward = 0
         self.pixel_array = None
         self._base_load_config()
         self._base_validate_config()
@@ -187,6 +189,7 @@ class Mupen64PlusEnv(gym.Env):
 
         self.step_count += 1
         # if self.episode_over:
+        self.episode_reward += reward
         return obs, reward, self.episode_over, {}
 
     def _act(self, action, count=1):
@@ -246,6 +249,9 @@ class Mupen64PlusEnv(gym.Env):
     def _reset(self):
         cprint('Reset called!', 'yellow')
         self.reset_count += 1
+        self.last_episode_reward = self.episode_reward
+        self.episode_reward = 0
+        
 
         self.step_count = 0
         return self._observe()

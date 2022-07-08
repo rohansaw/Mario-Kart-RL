@@ -14,6 +14,8 @@ from critic import SmullCritic, BigCritic
 import gym, gym_mupen64plus
 from threading import Thread
 from multiprocessing import Process
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import VecVideoRecorder, DummyVecEnv
 import argparse
 import logging
 from src.utils import set_logging, TimeMeasurement
@@ -78,8 +80,21 @@ class Context():
 torch.autograd.set_detect_anomaly(True)
 
 class MarioKartAgent():
-    def __init__(self, graphic_output=True, num_episodes=10, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=10, load_model=False):
+    def __init__(self, graphic_output=True, num_episodes=1000, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=10, load_model=False):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
+        
+        # def make_env():
+        #     env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
+        #     env = Monitor(env)
+        #     return env
+        # # Parallel environments
+        # env = DummyVecEnv([make_env])
+        # env.reset()
+        # # print(env.render(mode="rgb_array"))
+
+        # # check_env(env)
+        # self.env = VecVideoRecorder(env, f"videos/{0}", record_video_trigger=lambda x: x % 10000 == 0, video_length=500)
+
         # input_size = (30, 40, 3)
         input_size = (60, 80, 3)
         self.actor = SmullActor(input_size=input_size,

@@ -136,10 +136,11 @@ class MarioKartEnv(Mupen64PlusEnv):
         # print("starting with idx:", idx)
         if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) != self.lap:
             # print("here, is unequal")
+            idx += 1
             while(True):
                 next_idx = ((idx - 1) + len(self.CHECKPOINT_LOCATIONS)) % len(self.CHECKPOINT_LOCATIONS)
                 if next_idx == self._last_progress_point:
-                    print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
+                    # print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
                     return 0.0
                 if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[next_idx]]) == self.lap:
                 # if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[next_idx], self.CHECKPOINT_LOCATIONS[idx]]) != self.lap:
