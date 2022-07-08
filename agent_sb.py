@@ -18,7 +18,7 @@ def make_env():
 # Parallel environments
 env = DummyVecEnv([make_env])
 env.reset()
-print(env.render(mode="rgb_array"))
+# print(env.render(mode="rgb_array"))
 
 # check_env(env)
 env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 == 0, video_length=500)

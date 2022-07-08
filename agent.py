@@ -9,8 +9,8 @@ from select import epoll
 import time
 
 import torch
-from actor import LSTMActor, SimpleActor
-from critic import SimpleCritic
+from actor import LSTMActor, SmullActor, BigActor
+from critic import SmullCritic, BigCritic
 import gym, gym_mupen64plus
 from threading import Thread
 from multiprocessing import Process
@@ -78,13 +78,13 @@ class Context():
 torch.autograd.set_detect_anomaly(True)
 
 class MarioKartAgent():
-    def __init__(self, graphic_output=True, num_episodes=5000, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=10, load_model=False):
+    def __init__(self, graphic_output=True, num_episodes=10, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=10, load_model=False):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
         # input_size = (30, 40, 3)
         input_size = (60, 80, 3)
-        self.actor = SimpleActor(input_size=input_size,
+        self.actor = SmullActor(input_size=input_size,
                                  output_size=self.env.action_space.n)
-        self.critic = SimpleCritic(input_size=input_size)
+        self.critic = SmullCritic(input_size=input_size)
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.alpha = 0.001 # actor lr
