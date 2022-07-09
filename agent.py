@@ -1,6 +1,6 @@
 from pathlib import Path
 from copyreg import pickle
-from curses import termname
+from curses import raw, termname
 import random
 from urllib import request
 from tqdm import tqdm
@@ -104,7 +104,7 @@ class MarioKartAgent():
         self.max_steps = max_steps
         self.alpha = 0.001 # actor lr
         self.beta = 0.001 # critic lr
-        self.gamma = 0.95 # discount factor
+        self.gamma = 0.99 # discount factor
         self.step_size = 16
         self.context_size = 16
         self.warmup_episodes = 0
@@ -248,6 +248,7 @@ class MarioKartAgent():
             logging.info("phase 2") # Train actor and critic networks
             self.actor.reset_model()
             terminated_during_run = False
+            raw_rewards = []
             for t in tqdm(range(1,self.max_steps)):
                 context.add(self._transform_state(state))
                 
@@ -264,19 +265,26 @@ class MarioKartAgent():
                     last_q_value = self.critic(context.get_context()).detach()
                     self.train(action_probs, critic_values, rewards, done, last_q_value, t, episode_num)
                     context.pop()
-
+                raw_rewards.append(observed_reward)
+                # wandb.log({"rr_values": observed_reward}, step=t)
                 episode_reward += observed_reward
                 state = next_state
                 # time.sleep(1)
                 if terminated:
                     terminated_during_run = True
-                    logging.info(f'Episode {episode_num} finished with reward: {episode_reward}')
+                    print(f'Episode {episode_num} finished with reward: {episode_reward}')
+                    table = wandb.Table(data = [v for v in zip(range(self.max_steps), raw_rewards)], columns=["steps", "rews"])
                     wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
+                    # time.sleep(0.5)
+                    wandb.log({"rr_values": wandb.plot.line(table, "steps", "rews")})
                     all_rewards.append(episode_reward)
                     break
             if not terminated_during_run:
-                logging.info(f'Episode {episode_num} finished with reward: {episode_reward}')
+                print(f'Episode {episode_num} finished with reward: {episode_reward}')
+                table = wandb.Table(data = [v for v in zip(range(self.max_steps), raw_rewards)], columns=["steps", "rews"])
                 wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
+                # time.sleep(0.5)
+                wandb.log({"rr_values": wandb.plot.line(table, "steps", "rews")})
                 all_rewards.append(episode_reward)
             
             if all_rewards[-1] > best_reward:
@@ -284,11 +292,6 @@ class MarioKartAgent():
                 self.store_model()
                 best_reward = all_rewards[-1]
             
-        # input("press <enter> to exit....")
-        # print("visualizing result:")
-
-        # for _ in range(self.max_steps):
-        #     ...
         self.running = False
         self.env.close()
 

@@ -10,6 +10,7 @@
             "request": "launch",
             "program": "agent.py",
             "console": "integratedTerminal",
+            "args": ["--device", "cuda:0", "--graphic-output"],
             "justMyCode": false
         }
     ]
