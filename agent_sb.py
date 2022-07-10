@@ -37,7 +37,7 @@ env.reset()
 # print(env.render(mode="rgb_array"))
 
 # check_env(env)
-env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 == 0, video_length=500)
+env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 == 0, video_length=1250)
 
 model = A2C("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}")
 model.learn(total_timesteps=steps, callback=[RewardLogger(), WandbCallback(verbose=2, gradient_save_freq=5000, log="all")])
