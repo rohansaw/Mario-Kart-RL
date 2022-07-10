@@ -36,10 +36,12 @@ class SmolCritic(Module):
             nn.ReLU(), # max(0, x)
             nn.Flatten(),
         )
-        self.lstm1 = nn.LSTM(input_size=38400, hidden_size=64)
+        self.lstm1 = nn.LSTM(input_size=38400, hidden_size=128)
         self.classifier = nn.Sequential (
             nn.ReLU(), # max(0, x)
-            nn.Linear(64, 1),
+            nn.Linear(128, 32),
+            nn.ReLU(), # max(0, x)
+            nn.Linear(32, 1),
         )
         self.hidden = None
 

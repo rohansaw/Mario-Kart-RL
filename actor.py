@@ -18,7 +18,7 @@ class SmolActor(Module):
             nn.ReLU(), # max(0, x)
             nn.Flatten(),
         )
-        self.lstm1 = nn.LSTM(input_size=19200, hidden_size=128)
+        self.lstm1 = nn.LSTM(input_size=19200, hidden_size=128, num_layers=2, dropout=0.2)
         self.classifier = nn.Sequential (
             nn.ReLU(), # max(0, x)
             nn.Linear(128, 32),
