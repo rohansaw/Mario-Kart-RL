@@ -78,7 +78,7 @@ class Context():
     def pop(self):
         self.buffer_idx = (self.buffer_idx + self.buffer_size - 1) % self.buffer_size
         
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 class MarioKartAgent():
     def __init__(self, graphic_output=True, num_episodes=1000, max_steps=1160, use_wandb=True, visualize_last=True, visualize_every=20, load_model=False):
@@ -94,7 +94,7 @@ class MarioKartAgent():
         self.max_steps = max_steps
         self.alpha = 0.001 # actor lr
         self.beta = 0.001 # critic lr
-        self.gamma = 0.75 # discount factor
+        self.gamma = 0.99 # discount factor
         self.step_size = 16
         self.context_size = 16
         self.warmup_episodes = 0
@@ -140,6 +140,11 @@ class MarioKartAgent():
         '''Returns one-hot encoded action to play next and log_prob of this action in the distribution'''
         input_values = context.get_context()
         probs = self.actor(input_values)
+        if step % self.step_size == 0:
+            wandb.log({
+                "action_probs": wandb.Histogram(probs.detach().squeeze().cpu().numpy()), 
+                "favored_action": torch.argmax(probs).item(),
+            })
         
         # Use a categorical policy to sample the action that should be played next
         prob_dist = torch.distributions.Categorical(probs)
@@ -192,12 +197,10 @@ class MarioKartAgent():
             "actor_loss": actor_loss.item(),
             "critic_loss": critic_loss.item(),
             "advantage": advantage.mean(),
-            "episode": episode,
             # "action_probs": wandb.Histogram(action_probs.detach().squeeze().cpu().numpy())
         })
         # print(action_probs.detach().squeeze().cpu().numpy().shape)
         # print(action_probs.detach().cpu().numpy())
-        wandb.log({"action_probs": wandb.Histogram(action_probs.detach().squeeze().cpu().numpy())})
 
     def reset(self):
         obs = self.env.reset()
