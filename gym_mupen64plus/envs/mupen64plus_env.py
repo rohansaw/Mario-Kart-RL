@@ -283,18 +283,13 @@ class Mupen64PlusEnv(gym.Env):
         self._stop_controller_server()
 
     def _start_controller_server(self):
-        print("fs:", self.frame_skip)
         server = ControllerUpdater(
             input_host  = '',
             input_port= self.config['PORT_NUMBER'],
             control_timeout = self.config['ACTION_TIMEOUT'],
             frame_skip = self.frame_skip) # TODO: Environment argument (with issue #26)
-        # server_thread = threading.Thread(target=server.serve_forever, args=())
-        # server_thread.daemon = True
-        # server_thread.start()
         print('ControllerUpdater started on port ', self.config['PORT_NUMBER'])
         return server
-        # return server, server_thread
 
     def _stop_controller_server(self):
         #cprint('Stop Controller Server called!', 'yellow')
