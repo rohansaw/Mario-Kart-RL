@@ -187,7 +187,7 @@ class MarioKartAgent():
 
         actor_loss = (-action_probs * advantage.detach()).mean()
         actor_loss.backward()
-        # self.actor_optimizer.step()
+        self.actor_optimizer.step()
         wandb.log({
             "actor_loss": actor_loss.item(),
             "critic_loss": critic_loss.item(),
