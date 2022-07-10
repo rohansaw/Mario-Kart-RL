@@ -25,9 +25,9 @@ from bitorch.layers.config import config
 #         return self.model(x) # num actions x 1 
 
 
-class SmullCritic(Module):
+class SmolCritic(Module):
     def __init__(self, input_size):
-        super(SmullCritic, self).__init__()
+        super(SmolCritic, self).__init__()
         
         num_channels = input_size[2]
         self.convolution = nn.Sequential(

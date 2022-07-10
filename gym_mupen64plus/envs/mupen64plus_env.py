@@ -57,6 +57,8 @@ SCR_D = 3
 COUNTPEROP = 1
 MILLISECOND = 1.0 / 1000.0
 
+DEFAULT_PORT = 8082
+
 IMAGE_HELPER = ImageHelper()
 
 BENCHMARK = False
@@ -92,6 +94,9 @@ class Mupen64PlusEnv(gym.Env):
         self.frame_skip = self.config['FRAME_SKIP']
         if self.frame_skip < 1:
             self.frame_skip = 1
+        
+        
+        self.config["PORT_NUMBER"] = self._next_free_port(self.config["PORT_NUMBER"])
         self.controller_server = self._start_controller_server()
 
 
@@ -296,6 +301,18 @@ class Mupen64PlusEnv(gym.Env):
         if hasattr(self, 'controller_server'):
             self.controller_server.shutdown()
 
+    def _next_free_port(self, port):
+        max_ports_to_test = 30
+        for i in range(port, port + max_ports_to_test):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    print("trying out port", i, "...")
+                    s.bind(('localhost', i))
+                    return i
+                except:
+                    pass
+        raise Exception(f"cannot find any available port in range {port} - {port + max_ports_to_test}")
+
     def _start_emulator(self,
                         rom_name,
                         gfx_plugin,
@@ -340,6 +357,7 @@ class Mupen64PlusEnv(gym.Env):
                 # "--set", "Video-Rice[ColorQuality]=1",
         ]
 
+        
         cmd = [self.config['MUPEN_CMD'],
                 # "--nospeedlimit",
                "--nosaveoptions",
@@ -347,6 +365,7 @@ class Mupen64PlusEnv(gym.Env):
                "%ix%i" % (res_w, res_h),
                "--gfx", gfx_plugin,
                "--audio", "dummy",
+                "--set", f"Input-Bot-Control0[port]={self.config['PORT_NUMBER']}",
                "--input", input_driver_path,
                rom_path]
         
@@ -487,7 +506,6 @@ class ControllerState(object):
         self.controls = controls
 
     def to_msg(self):
-        # return json.dumps(self.__dict__)
         return "|".join([str(i) for i in self.controls])
 
 ###############################################
@@ -498,8 +516,6 @@ class ControllerUpdater(object):
         self.controls = ControllerState()
         self.input_host = input_host
         self.input_port = input_port
-        # self.controls_updated = threading.Event()
-        # self.response_sent = threading.Event()
         self.running = True
         self.frame_skip = frame_skip
         self.frame_skip_enabled = True
@@ -512,85 +528,24 @@ class ControllerUpdater(object):
         frame_skip = count if count is not None else self.frame_skip
         msg += f"|{frame_skip if self.frame_skip_enabled else 0}#"
         
-        # print("one")
         try:
-            # print("normal one")
             self.socket.sendall(msg.encode())
-            # time.sleep(0.1)
             self.socket.recv(1)
         except:
-            # print("reconnect")
-            # start = time.time()
+            # reconnect
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # start2 = time.time()
             self.socket.connect((self.input_host, self.input_port))
-            # end = time.time()
-            # print("took:", end - start, "mid:", (end - start2))
             self.socket.sendall(msg.encode())
             self.socket.recv(1)
-        # time.sleep(1)
-
-        # Tell the request handler that the controls have been updated so it can send the response now:
-        # self.controls_updated.set()
-
-        # Wait for response to actually be sent before returning:-V rtable] [-W recvlimit][-w timeout] [-X proxy_protocol] [-x proxy_a
-
     def shutdown(self):
         self.running = False
         self.socket.close()
 
-        # # Make sure we aren't blocking on anything:
-        # self.response_sent.set()
-        # self.controls_updated.set()
-
-        # # Shutdown the server:
-        # if PY3_OR_LATER:
-        #     super().shutdown()
-        #     super().server_close()
-        # else:
-        #     super(ControllerHTTPServer, self).shutdown()
-        #     super(ControllerHTTPServer, self).server_close()
-
-    # http://preshing.com/20110920/the-python-with-statement-by-example/#implementing-the-context-manager-as-a-generator
     @contextmanager
     def frame_skip_disabled(self):
         self.frame_skip_enabled = False
         yield True
         self.frame_skip_enabled = True
-
-    # class ControllerRequestHandler(BaseHTTPRequestHandler, object):
-
-    #     def log_message(self, fmt, *args):
-    #         pass
-
-    #     def write_response(self, resp_code, resp_data):
-    #         self.send_response(resp_code)
-    #         self.send_header("Content-type", "application/json")
-    #         self.end_headers()
-    #         self.wfile.write(resp_data.encode())
-
-    #     def do_GET(self):
-    #         # Wait for the controls to be updated before responding:
-    #         if self.server.running:
-    #             self.server.controls_updated.wait()
-
-    #         if not self.server.running:
-    #             print('Sending SHUTDOWN response')
-    #             # TODO: This sometimes fails with a broken pipe because
-    #             # the emulator has already stopped. Should handle gracefully (Issue #4)
-    #             self.write_response(500, "SHUTDOWN")
-    #         else:
-    #             ### respond with controller output
-    #             self.write_response(200, self.server.controls.to_json())
-
-    #         self.server.responses_sent += 1
-
-    #         # If we have sent the controls 'n' times now...
-    #         if self.server.responses_sent >= self.server.frame_skip or not self.server.frame_skip_enabled:
-    #             # ...we fire the response_sent event so the next action can happen:
-    #             self.server.controls_updated.clear()
-    #             self.server.response_sent.set()
-
 
 
 ###############################################

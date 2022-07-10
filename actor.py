@@ -5,9 +5,9 @@ from bitorch.layers import ShapePrintDebug, InputPrintDebug, WeightPrintDebug
 
 from bitorch.layers.config import config
 
-class SmullActor(Module):
+class SmolActor(Module):
     def __init__(self, input_size, output_size):
-        super(SmullActor, self).__init__()
+        super(SmolActor, self).__init__()
         
         num_channels = input_size[2]
         self.convolution = nn.Sequential(
@@ -24,7 +24,7 @@ class SmullActor(Module):
             nn.Linear(128, 32),
             nn.ReLU(), # max(0, x)
             nn.Linear(32, output_size),
-            nn.Softmax(),
+            nn.Softmax(dim=1),
         )
         self.hidden = None
 

@@ -1,7 +1,7 @@
 *.pyc
 *.egg-info/
 
-# install/
+install/
 log.log
 
 wandb
@@ -11,3 +11,4 @@ __pycache__
 .vscode
 videos
 runs
+recordings

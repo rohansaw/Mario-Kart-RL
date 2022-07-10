@@ -1,3 +1,4 @@
+import numpy as np
 from pathlib import Path
 from copyreg import pickle
 from curses import raw, termname
@@ -9,8 +10,8 @@ from select import epoll
 import time
 
 import torch
-from actor import LSTMActor, SmullActor, BigActor
-from critic import SmullCritic, BigCritic
+from actor import LSTMActor, SmolActor, BigActor
+from critic import SmolCritic, BigCritic
 import gym, gym_mupen64plus
 from threading import Thread
 from multiprocessing import Process
@@ -80,31 +81,20 @@ class Context():
 torch.autograd.set_detect_anomaly(True)
 
 class MarioKartAgent():
-    def __init__(self, graphic_output=True, num_episodes=1000, max_steps=1150, use_wandb=True, visualize_last=True, visualize_every=10, load_model=False):
+    def __init__(self, graphic_output=True, num_episodes=1000, max_steps=1160, use_wandb=True, visualize_last=True, visualize_every=20, load_model=False):
         self.env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-        
-        # def make_env():
-        #     env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-        #     env = Monitor(env)
-        #     return env
-        # # Parallel environments
-        # env = DummyVecEnv([make_env])
-        # env.reset()
-        # # print(env.render(mode="rgb_array"))
-
-        # # check_env(env)
-        # self.env = VecVideoRecorder(env, f"videos/{0}", record_video_trigger=lambda x: x % 10000 == 0, video_length=500)
+        self.env = gym.wrappers.RecordVideo(self.env, "./recordings", episode_trigger=lambda x: x % visualize_every == 0)
 
         # input_size = (30, 40, 3)
         input_size = (60, 80, 3)
-        self.actor = SmullActor(input_size=input_size,
+        self.actor = SmolActor(input_size=input_size,
                                  output_size=self.env.action_space.n)
-        self.critic = SmullCritic(input_size=input_size)
+        self.critic = SmolCritic(input_size=input_size)
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.alpha = 0.001 # actor lr
         self.beta = 0.001 # critic lr
-        self.gamma = 0.99 # discount factor
+        self.gamma = 0.75 # discount factor
         self.step_size = 16
         self.context_size = 16
         self.warmup_episodes = 0
@@ -197,8 +187,17 @@ class MarioKartAgent():
 
         actor_loss = (-action_probs * advantage.detach()).mean()
         actor_loss.backward()
-        self.actor_optimizer.step()
-        wandb.log({"actor_loss": actor_loss.item(), "critic_loss": critic_loss.item(), "advantage": advantage.mean(), "episode": episode}, step=(episode * self.max_steps) + step)
+        # self.actor_optimizer.step()
+        wandb.log({
+            "actor_loss": actor_loss.item(),
+            "critic_loss": critic_loss.item(),
+            "advantage": advantage.mean(),
+            "episode": episode,
+            # "action_probs": wandb.Histogram(action_probs.detach().squeeze().cpu().numpy())
+        })
+        # print(action_probs.detach().squeeze().cpu().numpy().shape)
+        # print(action_probs.detach().cpu().numpy())
+        wandb.log({"action_probs": wandb.Histogram(action_probs.detach().squeeze().cpu().numpy())})
 
     def reset(self):
         obs = self.env.reset()
@@ -253,11 +252,14 @@ class MarioKartAgent():
                 context.add(self._transform_state(state))
                 
                 action, action_prob = self.select_action(context, t + episode_num * self.max_steps)
-                wandb.log({"action": action.detach()}, step= t + episode_num * self.max_steps)
                 if episode_num < self.warmup_episodes:
                     action = random.randint(0, self.env.action_space.n - 1)
                 next_state, observed_reward, terminated, _ = self.step(action if isinstance(action, int) else action.detach())
                 buffer.add(action_prob, self.critic(context.get_context()), observed_reward, terminated)
+                wandb.log({"action": action.detach(), "raw_other_reward": observed_reward})
+                wandb.log({"raw_other_reward_per_step": observed_reward}, step=t)
+                # wandb.log({"action": action.detach(), "raw_other_reward": observed_reward}, step= t + episode_num * self.max_steps)
+                # wandb.log({"raw_other_reward_per_step": observed_reward}, step= t)
                 
                 if terminated or (t != 0 and t % self.step_size == 0):
                     action_probs, critic_values, rewards, done = buffer.flush()
@@ -273,24 +275,31 @@ class MarioKartAgent():
                 if terminated:
                     terminated_during_run = True
                     print(f'Episode {episode_num} finished with reward: {episode_reward}')
-                    table = wandb.Table(data = [v for v in zip(range(self.max_steps), raw_rewards)], columns=["steps", "rews"])
-                    wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
+                    # table = wandb.Table(data = [v for v in zip(range(self.max_steps), raw_rewards)], columns=["steps", "rews"])
+                    wandb.log({"reward": episode_reward})
+                    # wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
                     # time.sleep(0.5)
-                    wandb.log({"rr_values": wandb.plot.line(table, "steps", "rews")})
+                    # wandb.log({"rr_values": wandb.plot.line(table, "steps", "rews")})
                     all_rewards.append(episode_reward)
                     break
             if not terminated_during_run:
                 print(f'Episode {episode_num} finished with reward: {episode_reward}')
-                table = wandb.Table(data = [v for v in zip(range(self.max_steps), raw_rewards)], columns=["steps", "rews"])
-                wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
+                # table = wandb.Table(data = [v for v in zip(range(self.max_steps), raw_rewards)], columns=["steps", "rews"])
+                wandb.log({"reward": episode_reward})
+                # wandb.log({"reward": episode_reward}, step=t + episode_num * self.max_steps)
                 # time.sleep(0.5)
-                wandb.log({"rr_values": wandb.plot.line(table, "steps", "rews")})
+                # wandb.log({"rr_values": wandb.plot.line(table, "steps", "rews")})
                 all_rewards.append(episode_reward)
             
             if all_rewards[-1] > best_reward:
                 print("storing best model which achieved reward:", all_rewards[-1])
                 self.store_model()
                 best_reward = all_rewards[-1]
+            
+            if episode_num % self.visualize_every == 1:
+                path = self.env.video_recorder.path
+                print("uploading from path:", path)
+                wandb.log({"agent": wandb.Video(path)})
             
         self.running = False
         self.env.close()

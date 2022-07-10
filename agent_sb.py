@@ -23,7 +23,7 @@ class RewardLogger(BaseCallback):
         # print(self.locals.keys())
         # print(self.locals["env"].envs[0].last_episode_reward)
         if self.n_calls % 500 == 0:
-            wandb.log({"reward": np.average(self.locals["rewards"])}, step=self.locals["env"].envs[0].reset_count)
+            wandb.log({"reward": np.sum(self.locals["rewards"])}, step=self.locals["env"].envs[0].reset_count)
             # wandb.log({"reward": self.locals["env"].envs[0].last_episode_reward}, step=self.locals["env"].envs[0].reset_count)
         return True
 
