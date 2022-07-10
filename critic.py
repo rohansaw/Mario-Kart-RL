@@ -31,7 +31,7 @@ class SmolCritic(Module):
         
         num_channels = input_size[2]
         self.convolution = nn.Sequential(
-            ShapePrintDebug(debug_interval=1, name="input"),
+            # ShapePrintDebug(debug_interval=1, name="input"),
             nn.Conv2d(num_channels, 32, kernel_size=4, padding=1, stride=2),
             nn.ReLU(), # max(0, x)
             nn.Flatten(),

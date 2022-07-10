@@ -11,7 +11,7 @@ class SmolActor(Module):
         
         num_channels = input_size[2]
         self.convolution = nn.Sequential(
-            ShapePrintDebug(debug_interval=1, name="input"),
+            # ShapePrintDebug(debug_interval=1, name="input"),
             nn.Conv2d(num_channels, 32, kernel_size=4, padding=1, stride=2),
             nn.ReLU(), # max(0, x)
             nn.Conv2d(32, 64, kernel_size=4, padding=1, stride=2),
@@ -24,14 +24,16 @@ class SmolActor(Module):
             nn.Linear(128, 32),
             nn.ReLU(), # max(0, x)
             nn.Linear(32, output_size),
-            nn.Softmax(dim=1),
+            # ShapePrintDebug(debug_interval=1, name="softmax_input"),
+            nn.Softmax(dim=0),
         )
         self.hidden = None
 
     def forward(self, x):
+        # config.debug_activated = True
         convoluted = self.convolution(x)
         output, hidden = self.lstm1(convoluted)
-        return self.classifier(hidden[0]) # num actions x 1 
+        return self.classifier(hidden[0][-1]) # num actions x 1 
 
     def reset_model(self):
         self.hidden = None

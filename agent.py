@@ -150,7 +150,7 @@ class MarioKartAgent():
         prob_dist = torch.distributions.Categorical(probs)
         action_index = prob_dist.sample() # Returns index of action to plays
         action_prob = prob_dist.log_prob(action_index)
-        return action_index[0], action_prob
+        return action_index, action_prob
 
     def conditional_render(self):
         if self.graphic_output:
@@ -260,7 +260,6 @@ class MarioKartAgent():
                 next_state, observed_reward, terminated, _ = self.step(action if isinstance(action, int) else action.detach())
                 buffer.add(action_prob, self.critic(context.get_context()), observed_reward, terminated)
                 wandb.log({"action": action.detach(), "raw_other_reward": observed_reward})
-                wandb.log({"raw_other_reward_per_step": observed_reward}, step=t)
                 # wandb.log({"action": action.detach(), "raw_other_reward": observed_reward}, step= t + episode_num * self.max_steps)
                 # wandb.log({"raw_other_reward_per_step": observed_reward}, step= t)
                 
