@@ -26,6 +26,7 @@ env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x
 model = A2C("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}")
 model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, gradient_save_freq=5000, log="all"))
 model.save("models/mk__a2c_cnn_1kk_reset_impl")
+wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")
 #model = A2C.load("models/mk__a2c_cnn_2_no_cp")
 obs = env.reset()
 while True:
