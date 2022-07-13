@@ -1,6 +1,6 @@
 import gym, gym_mupen64plus
 
-from stable_baselines3 import A2C
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecVideoRecorder, DummyVecEnv
@@ -39,10 +39,10 @@ env.reset()
 # check_env(env)
 env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 == 0, video_length=1250)
 
-model = A2C("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}")
+model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}")
 model.learn(total_timesteps=steps, callback=[RewardLogger(), WandbCallback(verbose=2, gradient_save_freq=5000, log="all")])
 # model.learn(total_timesteps=steps, callback=[RewardLogger, WandbCallback(verbose=2, gradient_save_freq=5000, log="all")])
-model.save("models/mk__a2c_cnn_1kk_reset_impl")
+model.save("models/models_ppo_1kk_reset_impl")
 #model = A2C.load("models/mk__a2c_cnn_2_no_cp")
 obs = env.reset()
 while True:
