@@ -10,8 +10,19 @@ import numpy as np
 from wandb.integration.sb3 import WandbCallback
 
 
+
 steps = 10_000_000
-run = wandb.init(monitor_gym=True, config={"project": "Stable-Baselines", "steps": steps}, sync_tensorboard=True)
+learning_rate = 3e-4
+n_steps: int = 2048
+batch_size: int = 64
+n_epochs: int = 10
+gamma: float = 0.99
+gae_lambda: float = 0.95
+
+config = {"project": "Stable-Baselines", "steps": steps, "learning_rate": learning_rate, "n_epochs": n_epochs,
+          "n_steps": n_steps, "gamma": gamma, "gae_lambda": gae_lambda, "batch_size": batch_size}
+
+run = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True)
 
 class RewardLogger(BaseCallback):
     """
@@ -39,10 +50,11 @@ env.reset()
 # check_env(env)
 env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 == 0, video_length=1250)
 
-model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}")
-model.learn(total_timesteps=steps, callback=[RewardLogger(), WandbCallback(verbose=2, gradient_save_freq=5000, log="all")])
-# model.learn(total_timesteps=steps, callback=[RewardLogger, WandbCallback(verbose=2, gradient_save_freq=5000, log="all")])
-model.save("models/models_ppo_1kk_reset_impl")
+model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", learning_rate=learning_rate, n_steps=n_steps,
+            gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
+model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, gradient_save_freq=5000, log="all"))
+model.save("models/mk__a2c_cnn_1kk_reset_impl")
+wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")
 #model = A2C.load("models/mk__a2c_cnn_2_no_cp")
 obs = env.reset()
 while True:

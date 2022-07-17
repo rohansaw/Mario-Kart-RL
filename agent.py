@@ -213,6 +213,8 @@ class MarioKartAgent():
             # pickle.dump()
         torch.save(self.actor.state_dict(), self.output_path / "actor.pckl")
         torch.save(self.critic.state_dict(), self.output_path / "critic.pckl")
+        wandb.save(f'{self.output_path}/actor.pckl')
+        wandb.save(f'{self.output_path}/critic.pckl')
     
     def load_model(self):
         self.actor.load_state_dict(torch.load(self.output_path / "actor.pckl"))
