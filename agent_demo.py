@@ -17,15 +17,20 @@ for i in range(100):
 
 print("GO! ...drive straight as fast as possible...")
 start = time.time()
+rews = []
 for i in range(1000):
-    (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
-    # print("rew:", rew)
+    (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
+    # (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
+    print("rew:", rew)
     if render:
         env.render()
+    # time.sleep(0.2)
+    rews.append(rew)
 end = time.time()
 print(1000 / (end - start), "frames per second, total:", (end-start), "seconds")
 print(end - start, " seconds per 1000 steps")
-
+print(rews)
+print(sum(rews))
 # print("Doughnuts!!")
 # for i in range(10000):
 #     if i % 100 == 0:

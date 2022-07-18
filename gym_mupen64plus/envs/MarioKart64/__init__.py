@@ -29,11 +29,13 @@ for course in courses:
         id='Mario-Kart-%s-v0' % course['name'],
         entry_point='gym_mupen64plus.envs.MarioKart64:MarioKartEnv',
         kwargs={'course' : course['name'].replace('-','')},
-        #tags={
+        # tags={
         #    'mupen': True,
         #    'cup': course['cup'],
-        #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
-        #},
+        # #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
+
+        # },
+        max_episode_steps=course["max_steps"],
         nondeterministic=True,
     )
 
@@ -42,10 +44,11 @@ for course in courses:
         id='Mario-Kart-Discrete-%s-v0' % course['name'],
         entry_point='gym_mupen64plus.envs.MarioKart64:MarioKartDiscreteEnv',
         kwargs={'course' : course['name'].replace('-','')},
-        #tags={
+        # tags={
         #    'mupen': True,
         #    'cup': course['cup'],
         #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
-        #},
+        # },
+        max_episode_steps=course["max_steps"],
         nondeterministic=True,
     )

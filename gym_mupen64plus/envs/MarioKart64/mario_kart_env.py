@@ -19,15 +19,18 @@ class MarioKartEnv(Mupen64PlusEnv):
                              "mupen64plus-video-glide64mk2.so" : (214, 148, 214),
                              "mupen64plus-video-glide64.so"    : (157, 112, 158)}
 
-    HUD_PROGRESS_COLOR_VALUES = {(000, 000, 255): 1, #   Blue: Lap 1
-                                 (255, 255, 000): 2, # Yellow: Lap 2
-                                 (255, 000, 000): 3} #    Red: Lap 3
+    HUD_PROGRESS_COLOR_VALUES = {(000, 000, 255): 0, #   Blue: Lap 1
+                                 (255, 255, 000): 1, # Yellow: Lap 2
+                                 (255, 000, 000): 2} #    Red: Lap 3
 
     DEFAULT_STEP_REWARD = -0.1
-    LAP_REWARD = 100
+    LAP_REWARD = 200
     CHECKPOINT_REWARD = 0.5
-    BACKWARDS_PUNISHMENT = -1
+    BACKWARDS_PUNISHMENT = 2
     END_REWARD = 1000
+    
+    PROGRESS_SCALE = 1
+    PROGRESS_REWARD = 1.0
 
     END_EPISODE_THRESHOLD = 0
 
@@ -62,7 +65,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.config.update(yaml.safe_load(open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "mario_kart_config.yml"))))
         
     def _validate_config(self):
-        print("validate sub")
+        # print("validate sub")
         gfx_plugin = self.config["GFX_PLUGIN"]
         if gfx_plugin not in self.END_RACE_PIXEL_COLORS:
             raise AssertionError("Video Plugin '" + gfx_plugin + "' not currently supported by MarioKart environment")
@@ -91,8 +94,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=76, wait_for='race to load')
 
     def _reset(self):
-        self.lap = 1
+        self.lap = 0
         self.step_count_at_lap = 0
+        self._last_progress_point = 0
         self.last_known_lap = -1
 
         checkpoints = []
@@ -102,11 +106,12 @@ class MarioKartEnv(Mupen64PlusEnv):
             checkpoints = self.CHECKPOINTS_320
         if self.res_w == 640:
             checkpoints = self.CHECKPOINTS_640
+        self.checkpoints = checkpoints
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*checkpoints))
         # self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
-        if self.ENABLE_CHECKPOINTS:
-            self._checkpoint_tracker = [[False for i in range(len(self.CHECKPOINT_LOCATIONS))] for j in range(3)]
-            self.last_known_ckpt = -1
+        # if self.ENABLE_CHECKPOINTS:
+        #     self._checkpoint_tracker = [[False for i in range(len(self.CHECKPOINT_LOCATIONS))] for j in range(3)]
+        #     self.last_known_ckpt = -1
         
         # Nothing to do on the first call to reset()
         if self.reset_count > 0:
@@ -123,14 +128,44 @@ class MarioKartEnv(Mupen64PlusEnv):
     def reset(self):
         return self._reset()
 
+    def _get_progress(self):
+        idx = self._last_progress_point
+        value_of_last_progress_point = self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]])
+        if idx == 0 and value_of_last_progress_point == -1:
+            return 0
+        
+        # should be the case if we went backwards
+        if value_of_last_progress_point != self.lap:
+            while(True):
+                idx = ((idx - 1) + len(self.CHECKPOINT_LOCATIONS)) % len(self.CHECKPOINT_LOCATIONS)
+                if idx == self._last_progress_point:
+                    print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
+                    self._last_progress_point = 0
+                    return 0.0
+                if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) == self.lap:
+                    break
+        else:
+            while(True):
+                idx = (idx + 1) % len(self.CHECKPOINT_LOCATIONS)
+                if idx == self._last_progress_point:
+                    print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
+                    self._last_progress_point = 0
+                    return 0.0
+                if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) != self.lap:
+                    break
+        idx = ((idx - 1) + len(self.CHECKPOINT_LOCATIONS)) % len(self.CHECKPOINT_LOCATIONS)
+        dist = idx - self._last_progress_point
+        # if we got into a new lap, we have to get the real progress
+        if abs(dist) > (len(self.CHECKPOINT_LOCATIONS) // 2):
+            dist = len(self.CHECKPOINT_LOCATIONS) - abs(dist)
+        self._last_progress_point = idx
+        return dist * self.PROGRESS_SCALE
+
     def _get_reward(self):
         #cprint('Get Reward called!','yellow')
 
         reward_to_return = 0
         cur_lap = self._get_lap()
-
-        if self.ENABLE_CHECKPOINTS:
-            cur_ckpt = self._get_current_checkpoint()
 
         if self.episode_over:
             # Scale out the end reward based on the total steps to get here; the fewer steps, the higher the reward
@@ -141,38 +176,16 @@ class MarioKartEnv(Mupen64PlusEnv):
                 cprint('Lap %s!' % self.lap, 'green')
 
                 # Scale out the lap reward based on the steps to get here; the fewer steps, the higher the reward
-                steps_this_lap = self.step_count - self.step_count_at_lap
                 reward_to_return = self.LAP_REWARD # TODO: Figure out a good scale here... number of steps required per lap will vary depending on the course; don't want negative reward for completing a lap
-                self.step_count_at_lap = self.step_count
-
-            elif (self.ENABLE_CHECKPOINTS and cur_ckpt > -1 and
-                  not self._checkpoint_tracker[self.last_known_lap - 1][cur_ckpt]):
-
-                # TODO: Backwards across a lap boundary incorrectly grants a checkpoint reward
-                #       Need to investigate further. Might need to restore check for sequential checkpoints
-
-                #cprint(str(self.step_count) + ': CHECKPOINT achieved!', 'green')
-                self._checkpoint_tracker[self.lap - 1][cur_ckpt] = True
-                reward_to_return = self.CHECKPOINT_REWARD # TODO: This should reward per progress made. It seems as though currently, by going too fast, you could end up skipping over some progress rewards, which would encourage driving around a bit to achieve those rewards. Should reward whatever progress was achieved during the step (perhaps multiple 'checkpoints')
-
-            elif (self.ENABLE_CHECKPOINTS and ( cur_lap < self.last_known_lap or
-                                               cur_ckpt < self.last_known_ckpt)):
-                
-                #cprint(str(self.step_count) + ': BACKWARDS!!', 'red')
-                self._checkpoint_tracker[self.lap - 1][self.last_known_ckpt] = False
-                reward_to_return = self.BACKWARDS_PUNISHMENT
-
-            else:
-                reward_to_return = self.DEFAULT_STEP_REWARD
-
-        if self.ENABLE_CHECKPOINTS:
-            self.last_known_ckpt = cur_ckpt
+            progress = self._get_progress()
+            reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
+            reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
         self.last_known_lap = cur_lap
         return reward_to_return
 
     def _get_lap(self):
         # The first checkpoint is the upper left corner. It's value should tell us the lap.
-        ckpt_val = self._evaluate_checkpoint(self.CHECKPOINT_LOCATIONS[0])
+        ckpt_val = self._evaluate_checkpoint((self.CHECKPOINT_LOCATIONS[0], self.CHECKPOINT_LOCATIONS[1]))
 
         # If it is unknown, assume same lap (character icon is likely covering the corner)
         return ckpt_val if ckpt_val != -1 else self.lap
@@ -182,38 +195,53 @@ class MarioKartEnv(Mupen64PlusEnv):
 
         # Sample 4 pixels for each checkpoint to reduce the
         # likelihood of a pixel matching the color by chance
-
+        checkpoints = (
+            [(min_x + i, min_y) for i in range(max_x - min_x)] + # Top
+            [(max_x, min_y + i) for i in range(max_y - min_y)] + # Right
+            [(max_x - i, max_y) for i in range(max_x - min_x)] + # Bottom
+            [(min_x, max_y - i) for i in range(max_y - min_y)]   # Left
+        )
         # Top
-        for i in range((max_x - min_x) // 4):
-            x_val = min_x + i*4
-            y_val = min_y
-            yield [(x_val, y_val), (x_val + 1, y_val)]
-            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
+        # for i in range((max_x - min_x)):
+        #     x_val = min_x + i
+        #     y_val = min_y
+        #     # yield [(x_val, y_val), (x_val + 1, y_val)]
+        #     checkpoints.append((x_val, y_val))
+        #     # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
 
-        # Right-side
-        for i in range((max_y - min_y) // 4):
-            x_val = max_x
-            y_val = min_y + i*2
-            yield [(x_val, y_val), (x_val, y_val + 1)]
+        # # Right-side
+        # for i in range((max_y - min_y)):
+        #     x_val = max_x
+        #     y_val = min_y + i
+        #     checkpoints.append((x_val, y_val))
+        # yield [(x_val, y_val), (x_val, y_val + 1)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Bottom
-        for i in range((max_x - min_x) // 4):
-            if i == 0: # Skip the bottom right corner (for some reason MK doesn't draw it)
-                continue
-            x_val = max_x - i*4
-            y_val = max_y
-            yield [(x_val, y_val), (x_val - 1, y_val)]
+        # for i in range((max_x - min_x)):
+        #     if i == 0: # Skip the bottom right corner (for some reason MK doesn't draw it)
+        #         continue
+        #     x_val = max_x - i*4
+        #     y_val = max_y
+        # yield [(x_val, y_val), (x_val - 1, y_val)]
             # yield [(x_val, y_val)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
         
         # Left-side
-        for i in range((max_y - min_y) // 4):
-            x_val = min_x
-            y_val = max_y - i*2
-            # yield [(x_val, y_val)]
-            yield [(x_val, y_val), (x_val, y_val - 1)]
+        # for i in range((max_y - min_y)):
+        #     x_val = min_x
+        #     y_val = max_y - i*2
+        #     # yield [(x_val, y_val)]
+        # yield [(x_val, y_val), (x_val, y_val - 1)]
             # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
+        # checkpoints = [
+        #     [(min_x, min_y), (min_x + 1, min_y)],
+        #     [(max_x, min_y), (max_x, min_y + 1)],
+        #     [(max_x, max_y), (max_x - 1, max_y)],
+        #     [(min_x, max_y), (min_x, max_y - 1)],
+        # ]
+        return checkpoints
+        
 
     def _get_current_checkpoint(self):
         checkpoint_values = [self._evaluate_checkpoint(points)
@@ -272,14 +300,14 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _evaluate_end_state(self):
         # cprint('Evaluate End State called!','yellow')
         if self.res_w == 160:
-            if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12):
-                print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12))
+            # if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12):
+                # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12))
             return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12)
         if self.res_w == 320:
-            if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25):
-                print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25))
+            # if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25):
+            #     print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25))
             return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
-        print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51))
+        # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51))
         return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
 
     def _navigate_menu(self):
