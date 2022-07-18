@@ -1,49 +1,55 @@
+from multiprocessing.dummy import DummyProcess
 import gym, gym_mupen64plus
+import time
 
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import VecVideoRecorder, DummyVecEnv
+from stable_baselines3.common.vec_env import VecVideoRecorder, SubprocVecEnv, DummyVecEnv
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
 
+if __name__ == "__main__":
+    steps = 10_000_000
+    learning_rate = 3e-4
+    n_steps: int = 256
+    batch_size: int = 64
+    n_epochs: int = 10
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
 
-steps = 10_000_000
-learning_rate = 3e-4
-n_steps: int = 2048
-batch_size: int = 64
-n_epochs: int = 10
-gamma: float = 0.99
-gae_lambda: float = 0.95
+    config = {"project": "Stable-Baselines", "steps": steps, "learning_rate": learning_rate, "n_epochs": n_epochs,
+            "n_steps": n_steps, "gamma": gamma, "gae_lambda": gae_lambda, "batch_size": batch_size}
 
-config = {"project": "Stable-Baselines", "steps": steps, "learning_rate": learning_rate, "n_epochs": n_epochs,
-          "n_steps": n_steps, "gamma": gamma, "gae_lambda": gae_lambda, "batch_size": batch_size}
+    run = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True)
 
-run = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True)
+    def make_env(i):
+        def f():
+            time.sleep(12 * i)
+            env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
+            env = Monitor(env)
+            return env
+        return f
+    # Parallel environments
+    env = DummyVecEnv([make_env(0)])
+    # env = SubprocVecEnv([make_env(i) for i in range(6)])
+    env.reset()
+    # print(env.render(mode="rgb_array"))
 
-def make_env():
-    env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-    env = Monitor(env)
-    return env
-# Parallel environments
-env = DummyVecEnv([make_env])
-env.reset()
-# print(env.render(mode="rgb_array"))
+    # check_env(env)
+    env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 < 1000, video_length=5000)
 
-# check_env(env)
-env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 50000 == 0, video_length=5000)
-
-model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", learning_rate=learning_rate, n_steps=n_steps,
-            gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
-model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, gradient_save_freq=5000, log="all"))
-model.save("models/mk__a2c_cnn_1kk_reset_impl")
-wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")
-#model = A2C.load("models/mk__a2c_cnn_2_no_cp")
-obs = env.reset()
-while True:
-    action, _states = model.predict(obs)
-    obs, rewards, dones, info = env.step(action)
-    print(rewards)
-    wandb.log({"evaluation/rewards": rewards})
-    env.render()
+    model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", learning_rate=learning_rate, n_steps=n_steps,
+                gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
+    model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, gradient_save_freq=5000, log="all"))
+    model.save("models/mk__a2c_cnn_1kk_reset_impl")
+    wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")
+    #model = A2C.load("models/mk__a2c_cnn_2_no_cp")
+    obs = env.reset()
+    while True:
+        action, _states = model.predict(obs)
+        obs, rewards, dones, info = env.step(action)
+        print(rewards)
+        wandb.log({"evaluation/rewards": rewards})
+        env.render()

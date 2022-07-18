@@ -1,3 +1,5 @@
+from PIL import Image
+import time
 import abc
 import inspect
 import random
@@ -121,6 +123,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         return super(MarioKartEnv, self)._step(controls)
 
     def _reset_after_race(self):
+        print("resetting after race")
         self._wait(count=275, wait_for='times screen')
         self._navigate_post_race_menu()
         self._wait(count=40, wait_for='map select screen')
@@ -128,6 +131,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=50, wait_for='race to load')
 
     def _reset_during_race(self):
+        print("resetting during race")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -136,6 +140,22 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._press_button(ControllerState.JOYSTICK_DOWN)
         self._press_button(ControllerState.A_BUTTON)
         self._wait(count=76, wait_for='race to load')
+    
+    def _reset_during_race_change_course(self):
+        print("resetting during race CHANGING COURSE")
+        # Can't pause the race until the light turns green
+        if (self.step_count * self.controller_server.frame_skip) < 120:
+            steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
+            self._wait(count=steps_to_wait, wait_for='green light so we can pause')
+        self._press_button(ControllerState.START_BUTTON)
+        self._press_button(ControllerState.JOYSTICK_DOWN)
+        self._press_button(ControllerState.JOYSTICK_DOWN)
+        self._press_button(ControllerState.A_BUTTON)
+        self._wait(count=31, wait_for='race to load')
+        
+        self._navigate_map_select()
+        
+        self._wait(count=46, wait_for='race to load')
 
     def _reset(self):
         self.lap = 0
@@ -148,14 +168,15 @@ class MarioKartEnv(Mupen64PlusEnv):
         if self.reset_count > 0:
             # Make sure we don't skip frames while navigating the menus
             with self.controller_server.frame_skip_disabled():
-                if self.episode_over or self.random_tracks:
-                    if self.random_tracks:
-                        self._set_course(random.choice(list(self.COURSES.keys())))
+                if self.random_tracks:
+                    self._set_course(random.choice(list(self.COURSES.keys())))
+                    self._reset_during_race_change_course()
+                elif self.episode_over:
                     self._reset_after_race()
-                    self.episode_over = False
                 else:
                     self._reset_during_race()
 
+        self.episode_over = False
         return super(MarioKartEnv, self)._reset()
 
     def reset(self):
@@ -174,7 +195,7 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if idx == self._last_progress_point:
                     print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
                     self._last_progress_point = 0
-                    return 0.0
+                    return -1.0
                 if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) == self.lap:
                     break
         else:
@@ -183,7 +204,7 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if idx == self._last_progress_point:
                     print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
                     self._last_progress_point = 0
-                    return 0.0
+                    return -1.0
                 if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) != self.lap:
                     break
         idx = ((idx - 1) + len(self.CHECKPOINT_LOCATIONS)) % len(self.CHECKPOINT_LOCATIONS)

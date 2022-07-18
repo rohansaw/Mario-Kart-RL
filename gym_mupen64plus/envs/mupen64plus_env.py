@@ -4,12 +4,6 @@ import socket
 
 PY3_OR_LATER = sys.version_info[0] >= 3
 
-if PY3_OR_LATER:
-    # Python 3 specific definitions
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-else:
-    # Python 2 specific definitions
-    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import abc
 import array
@@ -219,6 +213,8 @@ class Mupen64PlusEnv(gym.Env):
             # print("sending...")
         else:
             self.controller_server.send_controls(ControllerState(action), count=count, force_count=force_count)
+        # self.render(mode="human")
+        # time.sleep(0.2)
         # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
