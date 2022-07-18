@@ -7,7 +7,7 @@ class Network(torch.nn.Module):
         super(Network, self).__init__()
         self.layer_1 = torch.nn.Conv2d(input_dimension[2], 32, kernel_size=4, padding=1, stride=2)
         self.layer_2 = torch.nn.Conv2d(32, 64, kernel_size=4, padding=1, stride=2)
-        self.output_layer = torch.nn.Linear(12000, output_dimension)
+        self.output_layer = torch.nn.Linear(307200, output_dimension)
         self.output_activation = output_activation
 
     def forward(self, inpt):
