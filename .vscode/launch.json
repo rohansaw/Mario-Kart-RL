@@ -5,6 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "sac.py",
+            "type": "python",
+            "request": "launch",
+            "program": "dsac_runner.py",
+            "console": "integratedTerminal",
+            "args": ["--device", "cuda:0", "--graphic-output"],
+            "justMyCode": false
+        },
+        {
             "name": "Agent.py",
             "type": "python",
             "request": "launch",
