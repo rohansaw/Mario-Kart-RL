@@ -4,9 +4,7 @@ from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecVideoRecorder, DummyVecEnv
-from stable_baselines3.common.callbacks import BaseCallback
 import wandb
-import numpy as np
 from wandb.integration.sb3 import WandbCallback
 
 
@@ -24,20 +22,6 @@ config = {"project": "Stable-Baselines", "steps": steps, "learning_rate": learni
 
 run = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True)
 
-class RewardLogger(BaseCallback):
-    """
-    Custom callback for plotting additional values in tensorboard.
-    """
-
-    def _on_step(self) -> bool:
-        # Log scalar value (here a random variable)
-        # print(self.locals.keys())
-        # print(self.locals["env"].envs[0].last_episode_reward)
-        if self.n_calls % 500 == 0:
-            wandb.log({"reward": np.sum(self.locals["rewards"])}, step=self.locals["env"].envs[0].reset_count)
-            # wandb.log({"reward": self.locals["env"].envs[0].last_episode_reward}, step=self.locals["env"].envs[0].reset_count)
-        return True
-
 def make_env():
     env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
     env = Monitor(env)
@@ -48,7 +32,7 @@ env.reset()
 # print(env.render(mode="rgb_array"))
 
 # check_env(env)
-env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 == 0, video_length=1250)
+env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 50000 == 0, video_length=5000)
 
 model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", learning_rate=learning_rate, n_steps=n_steps,
             gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
