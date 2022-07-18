@@ -20,17 +20,20 @@ if __name__ == "__main__":
             evaluation_episode = episode_number % TRAINING_EVALUATION_RATIO == 0
             episode_reward = 0
             state = env.reset()
+            state = np.transpose(state, (2, 0, 1))
             done = False
             i = 0
             while not done and i < STEPS_PER_EPISODE:
                 i += 1
                 action = agent.get_next_action(state, evaluation_episode=evaluation_episode)
                 next_state, reward, done, info = env.step(action)
+                next_state = np.transpose(next_state, (2, 0, 1))
                 if not evaluation_episode:
                     agent.train_on_transition(state, action, next_state, reward, done)
                 else:
                     episode_reward += reward
                 state = next_state
+                print(reward)
             if evaluation_episode:
                 run_results.append(episode_reward)
         agent_results.append(run_results)

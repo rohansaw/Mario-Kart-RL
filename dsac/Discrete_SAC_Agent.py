@@ -15,7 +15,7 @@ class SACAgent:
 
     def __init__(self, environment):
         self.environment = environment
-        self.state_dim = self.environment.observation_space.shape[0]
+        self.state_dim = self.environment.observation_space.shape
         self.action_dim = self.environment.action_space.n
         self.critic_local = Network(input_dimension=self.state_dim,
                                     output_dimension=self.action_dim)
