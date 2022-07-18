@@ -1,5 +1,6 @@
 import abc
 import inspect
+import random
 import itertools
 import os
 import yaml
@@ -23,6 +24,36 @@ class MarioKartEnv(Mupen64PlusEnv):
                                  (255, 255, 000): 1, # Yellow: Lap 2
                                  (255, 000, 000): 2} #    Red: Lap 3
 
+    CHARACTERS = {
+        'mario'  : (0, 0),
+        'luigi'  : (0, 1),
+        'peach'  : (0, 2),
+        'toad'   : (0, 3),
+        'yoshi'  : (1, 0),
+        'd.k.'   : (1, 1),
+        'wario'  : (1, 2),
+        'bowser' : (1, 3)
+    }
+    
+    COURSES = {
+        'LuigiRaceway'     : (0, 0),
+        'MooMooFarm'       : (0, 1),
+        'KoopaTroopaBeach' : (0, 2),
+        'KalimariDesert'   : (0, 3),
+        'ToadsTurnpike'    : (1, 0),
+        'FrappeSnowland'   : (1, 1),
+        'ChocoMountain'    : (1, 2),
+        'MarioRaceway'     : (1, 3),
+        'WarioStadium'     : (2, 0),
+        'SherbetLand'      : (2, 1),
+        'RoyalRaceway'     : (2, 2),
+        'BowsersCastle'    : (2, 3),
+        'DKsJungleParkway' : (3, 0),
+        'YoshiValley'      : (3, 1),
+        'BansheeBoardwalk' : (3, 2),
+        'RainbowRoad'      : (3, 3)
+    }
+
     DEFAULT_STEP_REWARD = -0.1
     LAP_REWARD = 200
     CHECKPOINT_REWARD = 0.5
@@ -40,16 +71,25 @@ class MarioKartEnv(Mupen64PlusEnv):
     MAP_SERIES = 0
     MAP_CHOICE = 0
 
-    ENABLE_CHECKPOINTS = False
     
-    CHECKPOINTS_160 = [16, 9, 146, 111]
-    CHECKPOINTS_320 = [32, 18, 292, 222]
-    CHECKPOINTS_640 = [64, 36, 584, 444]
+    CHECKPOINTS = {
+        160: [16, 9, 146, 111],
+        170: [17, 10, 155, 118],
+        320: [32, 18, 292, 222],
+        640: [64, 36, 584, 444],
+    }
 
-    def __init__(self, character='mario', course='LuigiRaceway'):
+    END_PIXELS = {
+        160: [50, 12],
+        170: [60, 18],
+        320: [101, 25],
+        640: [203, 51],
+    }
+
+    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=True, **kwargs):
         self._set_character(character)
         self._set_course(course)
-        super(MarioKartEnv, self).__init__()
+        super(MarioKartEnv, self).__init__(**kwargs)
 
         self.end_race_pixel_color = self.END_RACE_PIXEL_COLORS[self.config["GFX_PLUGIN"]]
 
@@ -60,6 +100,10 @@ class MarioKartEnv(Mupen64PlusEnv):
                     [  0,  1]]  # RB Button
         
         self.action_space = spaces.MultiDiscrete([len(action) for action in actions])
+        
+        self.random_tracks = random_tracks
+        self.checkpoints = self.CHECKPOINTS[self.res_w]
+        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
 
     def _load_config(self):
         self.config.update(yaml.safe_load(open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "mario_kart_config.yml"))))
@@ -99,25 +143,14 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._last_progress_point = 0
         self.last_known_lap = -1
 
-        checkpoints = []
-        if self.res_w == 160:
-            checkpoints = self.CHECKPOINTS_160
-        if self.res_w == 320:
-            checkpoints = self.CHECKPOINTS_320
-        if self.res_w == 640:
-            checkpoints = self.CHECKPOINTS_640
-        self.checkpoints = checkpoints
-        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*checkpoints))
-        # self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(64, 36, 584, 444)) 
-        # if self.ENABLE_CHECKPOINTS:
-        #     self._checkpoint_tracker = [[False for i in range(len(self.CHECKPOINT_LOCATIONS))] for j in range(3)]
-        #     self.last_known_ckpt = -1
-        
+
         # Nothing to do on the first call to reset()
         if self.reset_count > 0:
             # Make sure we don't skip frames while navigating the menus
             with self.controller_server.frame_skip_disabled():
-                if self.episode_over:
+                if self.episode_over or self.random_tracks:
+                    if self.random_tracks:
+                        self._set_course(random.choice(list(self.COURSES.keys())))
                     self._reset_after_race()
                     self.episode_over = False
                 else:
@@ -198,48 +231,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         checkpoints = (
             [(min_x + i, min_y) for i in range(max_x - min_x)] + # Top
             [(max_x, min_y + i) for i in range(max_y - min_y)] + # Right
-            [(max_x - i, max_y) for i in range(max_x - min_x)] + # Bottom
+            [(max_x - i, max_y) for i in range(1, max_x - min_x)] + # Bottom, for some reason the bottom right pixel in the progress bar is not rendered
             [(min_x, max_y - i) for i in range(max_y - min_y)]   # Left
         )
-        # Top
-        # for i in range((max_x - min_x)):
-        #     x_val = min_x + i
-        #     y_val = min_y
-        #     # yield [(x_val, y_val), (x_val + 1, y_val)]
-        #     checkpoints.append((x_val, y_val))
-        #     # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
-
-        # # Right-side
-        # for i in range((max_y - min_y)):
-        #     x_val = max_x
-        #     y_val = min_y + i
-        #     checkpoints.append((x_val, y_val))
-        # yield [(x_val, y_val), (x_val, y_val + 1)]
-            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
-        
-        # Bottom
-        # for i in range((max_x - min_x)):
-        #     if i == 0: # Skip the bottom right corner (for some reason MK doesn't draw it)
-        #         continue
-        #     x_val = max_x - i*4
-        #     y_val = max_y
-        # yield [(x_val, y_val), (x_val - 1, y_val)]
-            # yield [(x_val, y_val)]
-            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
-        
-        # Left-side
-        # for i in range((max_y - min_y)):
-        #     x_val = min_x
-        #     y_val = max_y - i*2
-        #     # yield [(x_val, y_val)]
-        # yield [(x_val, y_val), (x_val, y_val - 1)]
-            # yield [(x_val, y_val), (x_val + 1, y_val), (x_val, y_val + 1), (x_val + 1, y_val + 1)]
-        # checkpoints = [
-        #     [(min_x, min_y), (min_x + 1, min_y)],
-        #     [(max_x, min_y), (max_x, min_y + 1)],
-        #     [(max_x, max_y), (max_x - 1, max_y)],
-        #     [(min_x, max_y), (min_x, max_y - 1)],
-        # ]
         return checkpoints
         
 
@@ -298,17 +292,8 @@ class MarioKartEnv(Mupen64PlusEnv):
         return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
     def _evaluate_end_state(self):
-        # cprint('Evaluate End State called!','yellow')
-        if self.res_w == 160:
-            # if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12):
-                # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12))
-            return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 50, 12)
-        if self.res_w == 320:
-            # if self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25):
-            #     print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25))
-            return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 101, 25)
-        # print("end pixel:", IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51))
-        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, 203, 51) #TODO: adjust for smaller resolutions
+        end_pixel = self.END_PIXELS[self.res_w]
+        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')
@@ -419,33 +404,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._press_button(ControllerState.A_BUTTON)
 
     def _set_character(self, character):
-        characters = {'mario'  : (0, 0),
-                      'luigi'  : (0, 1),
-                      'peach'  : (0, 2),
-                      'toad'   : (0, 3),
-                      'yoshi'  : (1, 0),
-                      'd.k.'   : (1, 1),
-                      'wario'  : (1, 2),
-                      'bowser' : (1, 3)}
-
-        self.PLAYER_ROW, self.PLAYER_COL = characters[character]
+        cprint(f"using character {character}!", "green")
+        self.PLAYER_ROW, self.PLAYER_COL = self.CHARACTERS[character]
 
     def _set_course(self, course):
-        courses = {'LuigiRaceway'     : (0, 0),
-                   'MooMooFarm'       : (0, 1),
-                   'KoopaTroopaBeach' : (0, 2),
-                   'KalimariDesert'   : (0, 3),
-                   'ToadsTurnpike'    : (1, 0),
-                   'FrappeSnowland'   : (1, 1),
-                   'ChocoMountain'    : (1, 2),
-                   'MarioRaceway'     : (1, 3),
-                   'WarioStadium'     : (2, 0),
-                   'SherbetLand'      : (2, 1),
-                   'RoyalRaceway'     : (2, 2),
-                   'BowsersCastle'    : (2, 3),
-                   'DKsJungleParkway' : (3, 0),
-                   'YoshiValley'      : (3, 1),
-                   'BansheeBoardwalk' : (3, 2),
-                   'RainbowRoad'      : (3, 3)}
-
-        self.MAP_SERIES, self.MAP_CHOICE = courses[course]
+        cprint(f"playing course {course}!", "green")
+        self.MAP_SERIES, self.MAP_CHOICE = self.COURSES[course]

@@ -68,17 +68,27 @@ BENCHMARK = False
 class Mupen64PlusEnv(gym.Env):
     __metaclass__ = abc.ABCMeta
     metadata = {'render.modes': ['human', 'rgb_array']}
+    
+    resolutions = {
+        "normal": (640, 480),
+        "small": (320, 240),
+        # the logical next resolution would have been 160, 120. however the progress bar is not rendered properly in that resolution, so a slightly larger ones is picked instead
+        "supersmall": (170, 128),
+    }
 
-    # def __init__(self, benchmark=True, res_w=160, res_h=120):
-    def __init__(self, benchmark=True, res_w=320, res_h=240):
-    # def __init__(self, benchmark=True, res_w=640, res_h=480):
+    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=True, base_episode_length=500, episode_length_increase=10):
+        
         global SCR_W, SCR_H
-        # if not low_res_mode and not benchmark:
-        #     SCR_W = 640
-        #     SCR_H = 480
-        SCR_W, SCR_H = res_w, res_h
-        self.res_w = res_w
-        self.res_h = res_h
+        if res_w is not None and res_h is not None:
+            self.res_w = res_w
+            self.res_h = res_h
+        else:
+            self.res_w, self.res_h = self.resolutions[resolution]
+        cprint(f"using resolution {self.res_w}x{self.res_h}")
+        SCR_W, SCR_H = self.res_w, self.res_h
+        self.variable_episode_length = variable_episode_length
+        self.episode_length = base_episode_length
+        self.episode_length_increase = episode_length_increase
         
         self.viewer = None
         self.benchmark = benchmark
@@ -175,21 +185,24 @@ class Mupen64PlusEnv(gym.Env):
 
     def _step(self, action):
         #cprint('Step %i: %s' % (self.step_count, action), 'green')
-        start = time.time()
+        # start = time.time()
         self._act(action)
-        end = time.time()
+        # # end = time.time()
         # print("step time:", end - start)
-        start = time.time()
+        # # start = time.time()
         obs = self._observe()
-        end = time.time()
+        # # end = time.time()
         # print("observe time:", end - start)
-        start = time.time()
-        self.episode_over = self._evaluate_end_state()
-        end = time.time()
+        # # start = time.time()
+        if self.step_count >= self.episode_length:
+            self.episode_over = True
+        else:
+            self.episode_over = self._evaluate_end_state()
+        # # end = time.time()
         # print("_evaluate_end_state time:", end - start)
-        start = time.time()
+        # # start = time.time()
         reward = self._get_reward()
-        end = time.time()
+        # # end = time.time()
         # print("_get_reward time:", end - start)
 
         self.step_count += 1
@@ -197,18 +210,19 @@ class Mupen64PlusEnv(gym.Env):
         self.episode_reward += reward
         return obs, reward, self.episode_over, {}
 
-    def _act(self, action, count=1):
+    def _act(self, action, count=1, force_count=False):
         # print("got action:", action, "count:", count)
-        if not self.controller_server.frame_skip_enabled:
+        if not self.controller_server.frame_skip_enabled and not force_count:
+            # print("sending single passes")
             for _ in itertools.repeat(None, count):
                 self.controller_server.send_controls(ControllerState(action))
             # print("sending...")
         else:
-            self.controller_server.send_controls(ControllerState(action), count=count)
+            self.controller_server.send_controls(ControllerState(action), count=count, force_count=force_count)
         # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
-        self._act(ControllerState.NO_OP, count=count)
+        self._act(ControllerState.NO_OP, count=count, force_count=True)
 
     def _press_button(self, button, times=1):
         for _ in itertools.repeat(None, times):
@@ -256,6 +270,9 @@ class Mupen64PlusEnv(gym.Env):
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
         self.episode_reward = 0
+        if self.reset_count > 1 and self.variable_episode_length:
+            self.episode_length += self.episode_length_increase
+            cprint(f"next episode length: {self.episode_length}", "yellow")
         
 
         self.step_count = 0
@@ -342,10 +359,13 @@ class Mupen64PlusEnv(gym.Env):
             cprint(msg, 'red')
             raise Exception(msg)
         
-        print("got COUNTPEROP", COUNTPEROP)
         benchmark_options = [
                 "--nospeedlimit",
                 "--set", f"Core[CountPerOp]={COUNTPEROP}",
+                # "--set", f"Core[DelaySI]=False",
+                # "--set", f"Video-Glide64[filtering]=0",
+                # "--set", f"Video-Glide64[fast_crc]=True",
+                # "--set", f"Video-Glide64[fb_hires]=False",
                 # "--set", "Video-Rice[ScreenUpdateSetting]=3",
                 # "--set", "Video-Rice[FastTextureLoading]=1",
                 # "--set", "Video-Rice[TextureQuality]=2",
@@ -369,7 +389,7 @@ class Mupen64PlusEnv(gym.Env):
 
         xvfb_proc = None
         if self.config['USE_XVFB']:
-            display_num = -1
+            display_num = 0
             success = False
             # If we couldn't find an open display number after 15 attempts, give up
             while not success and display_num <= 15:
@@ -515,13 +535,13 @@ class ControllerUpdater(object):
         self.frame_skip = frame_skip
         self.frame_skip_enabled = True
 
-    def send_controls(self, controls, count=None):
+    def send_controls(self, controls, count=None, force_count=False):
         if not self.running:
             return
         self.controls = controls
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
-        msg += f"|{frame_skip if self.frame_skip_enabled else 0}#"
+        msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
         
         try:
             self.socket.sendall(msg.encode())

@@ -35,7 +35,7 @@ for course in courses:
         # #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
 
         # },
-        max_episode_steps=course["max_steps"],
+        # max_episode_steps=course["max_steps"],
         nondeterministic=True,
     )
 
@@ -49,6 +49,6 @@ for course in courses:
         #    'cup': course['cup'],
         #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
         # },
-        max_episode_steps=course["max_steps"],
+        # max_episode_steps=course["max_steps"],
         nondeterministic=True,
     )
