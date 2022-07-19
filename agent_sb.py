@@ -3,12 +3,15 @@ import gym, gym_mupen64plus
 import time
 
 from stable_baselines3 import A2C, PPO
-from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecVideoRecorder, SubprocVecEnv, DummyVecEnv
 import wandb
+from gym.envs import registry
 from wandb.integration.sb3 import WandbCallback
 
+WANDB = False
 
 if __name__ == "__main__":
     steps = 10_000_000
@@ -22,27 +25,40 @@ if __name__ == "__main__":
     config = {"project": "Stable-Baselines", "steps": steps, "learning_rate": learning_rate, "n_epochs": n_epochs,
             "n_steps": n_steps, "gamma": gamma, "gae_lambda": gae_lambda, "batch_size": batch_size}
 
-    run = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True)
-
-    def make_env(i):
+    if WANDB:
+        run_id = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True).id
+    else:
+        run_id = "run"
+    mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
+    def make_env(i, seed=0):
         def f():
-            time.sleep(12 * i)
-            env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0')
-            env = Monitor(env)
+            # time.sleep(11 * i)
+            env = gym.make(mario_kart_envs[i])
+            env.seed(seed + 2 ** i)
+            # env = Monitor(env)
             return env
+        set_random_seed(seed)
         return f
     # Parallel environments
     env = DummyVecEnv([make_env(0)])
-    # env = SubprocVecEnv([make_env(i) for i in range(6)])
+    # env = SubprocVecEnv([make_env(i) for i in range(4)], start_method="spawn")
+    # env = DummyVecEnv([make_env(i) for i in range(4)])
+    # env = make_vec_env('Mario-Kart-Discrete-Luigi-Raceway-v0', n_envs=4)
     env.reset()
     # print(env.render(mode="rgb_array"))
 
+    def trigger(x):
+        # print("got ", x)
+        result = x % 5000 == 0
+        if result:
+            print("TRIGGER")
+        return result
     # check_env(env)
-    env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 10000 < 1000, video_length=5000)
+    env = VecVideoRecorder(env, f"videos/{run_id}", record_video_trigger=trigger, video_length=1000)
 
-    model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", learning_rate=learning_rate, n_steps=n_steps,
+    model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=learning_rate, n_steps=n_steps,
                 gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
-    model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, gradient_save_freq=5000, log="all"))
+    model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, gradient_save_freq=5000, log="all") if WANDB else None)
     model.save("models/mk__a2c_cnn_1kk_reset_impl")
     wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")
     #model = A2C.load("models/mk__a2c_cnn_2_no_cp")

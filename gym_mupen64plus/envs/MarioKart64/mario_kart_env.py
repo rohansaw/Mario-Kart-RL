@@ -63,7 +63,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     END_REWARD = 1000
     
     PROGRESS_SCALE = 1
-    PROGRESS_REWARD = 1.0
+    PROGRESS_REWARD = 2.0
 
     END_EPISODE_THRESHOLD = 0
 

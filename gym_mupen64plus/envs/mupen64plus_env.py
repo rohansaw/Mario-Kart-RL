@@ -1,6 +1,8 @@
+from PIL import Image
 from pathlib import Path
 import sys
 import socket
+from ilock import ILock
 
 PY3_OR_LATER = sys.version_info[0] >= 3
 
@@ -224,7 +226,7 @@ class Mupen64PlusEnv(gym.Env):
         for _ in itertools.repeat(None, times):
             self._act(button) # Press
             self._act(ControllerState.NO_OP) # and release
-
+    
     def _observe(self):
         #cprint('Observe called!', 'yellow')
 
@@ -234,14 +236,13 @@ class Mupen64PlusEnv(gym.Env):
         else:
             offset_x = self.config['OFFSET_X']
             offset_y = self.config['OFFSET_Y']
-
         image_array = \
             np.array(self.mss_grabber.grab({"top": offset_y,
                                             "left": offset_x,
                                             "width": SCR_W,
                                             "height": SCR_H}),
-                     dtype=np.uint8)
-
+                    dtype=np.uint8)
+    
         # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
         self.pixel_array = np.flip(image_array[:, :, :3], 2)
         return self.pixel_array
@@ -388,13 +389,14 @@ class Mupen64PlusEnv(gym.Env):
             display_num = 0
             success = False
             # If we couldn't find an open display number after 15 attempts, give up
-            while not success and display_num <= 15:
+            while not success and display_num <= 99:
                 display_num += 1
                 xvfb_cmd = [self.config['XVFB_CMD'],
                             ":" + str(display_num),
                             "-screen",
                             "0",
                             "%ix%ix%i" % (res_w, res_h, res_d * 8),
+                            "-noreset",
                             "-fbdir",
                             self.config['TMP_DIR']]
 
