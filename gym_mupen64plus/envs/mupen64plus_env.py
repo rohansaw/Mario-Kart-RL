@@ -72,7 +72,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=False, base_episode_length=2000, episode_length_increase=1):
+    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=False, base_episode_length=2000, episode_length_increase=1, gray_scale=True):
         
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
@@ -95,6 +95,7 @@ class Mupen64PlusEnv(gym.Env):
         self.episode_reward = 0
         self.last_episode_reward = 0
         self.pixel_array = None
+        self.gray_scale = gray_scale
         self._base_load_config()
         self._base_validate_config()
         self.frame_skip = self.config['FRAME_SKIP']
@@ -245,6 +246,8 @@ class Mupen64PlusEnv(gym.Env):
     
         # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
         self.pixel_array = np.flip(image_array[:, :, :3], 2)
+        if self.gray_scale:
+            self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
         return self.pixel_array
 
     @abc.abstractmethod
