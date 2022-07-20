@@ -91,7 +91,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         640: [203, 51],
     }
 
-    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=True, **kwargs):
+    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=False, **kwargs):
         self._set_character(character)
         self._set_course(course)
         super(MarioKartEnv, self).__init__(**kwargs)
