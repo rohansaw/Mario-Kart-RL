@@ -221,6 +221,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         # if we got into a new lap, we have to get the real progress
         if abs(dist) > (len(self.CHECKPOINT_LOCATIONS) // 2):
             dist = len(self.CHECKPOINT_LOCATIONS) - abs(dist)
+            self._last_progresses = []
         self._last_progress_point = idx
         self._save_last_progress_point(idx)
         return dist * self.PROGRESS_SCALE

@@ -72,7 +72,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=False, base_episode_length=500, episode_length_increase=1):
+    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=False, base_episode_length=2000, episode_length_increase=1):
         
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
