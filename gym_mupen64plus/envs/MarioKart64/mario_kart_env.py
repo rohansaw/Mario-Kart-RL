@@ -59,11 +59,11 @@ class MarioKartEnv(Mupen64PlusEnv):
     DEFAULT_STEP_REWARD = -0.1
     LAP_REWARD = 200
     CHECKPOINT_REWARD = 0.5
-    BACKWARDS_PUNISHMENT = 2
+    BACKWARDS_PUNISHMENT = 3
     END_REWARD = 1000
     
     PROGRESS_SCALE = 1
-    PROGRESS_REWARD = 2.0
+    PROGRESS_REWARD = 1.0
 
     END_EPISODE_THRESHOLD = 0
 
@@ -171,12 +171,13 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if self.random_tracks:
                     self._set_course(random.choice(list(self.COURSES.keys())))
                     self._reset_during_race_change_course()
-                elif self.episode_over:
+                elif self.episode_complete:
                     self._reset_after_race()
                 else:
                     self._reset_during_race()
 
         self.episode_over = False
+        self.episode_complete = False
         return super(MarioKartEnv, self)._reset()
 
     def reset(self):
@@ -221,7 +222,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         reward_to_return = 0
         cur_lap = self._get_lap()
 
-        if self.episode_over:
+        if self.episode_completed:
             # Scale out the end reward based on the total steps to get here; the fewer steps, the higher the reward
             reward_to_return = 5 * (1250 - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
         else:
@@ -235,6 +236,9 @@ class MarioKartEnv(Mupen64PlusEnv):
             reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
             reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
         self.last_known_lap = cur_lap
+        # print("reward:", reward_to_return)
+        if reward_to_return > 1000:
+            print("whaaa?")
         return reward_to_return
 
     def _get_lap(self):

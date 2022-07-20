@@ -28,10 +28,10 @@ for i in range(300):
     if end:
         print("isch over", i)
         break
-    # print("rew:", rew)
+    print("rew:", rew)
     if render:
         env.render()
-    # time.sleep(0.02)
+    time.sleep(0.02)
     rews.append(rew)
 # print("steps:", i)
 # steps += i
@@ -76,37 +76,37 @@ for i in range(300):
 # print(steps / (end - start), "frames per second, total:", (end-start), "seconds")
 # print(end - start, f" seconds per {steps} steps")
 # # print(rews)
-# print(sum(rews))
-rc = 10
-start = time.time()
-for _ in range(rc):
-    env.reset()
+print(sum(rews))
+# rc = 10
+# start = time.time()
+# for _ in range(rc):
+#     env.reset()
     
-    print("NOOP waiting for green light")
-    for i in range(100):
-        (obs, rew, end, info) = env.step([0, 0, 0, 0, 0]) # NOOP until green light
-        if render:
-            env.render()
-        time.sleep(0.2)
+#     print("NOOP waiting for green light")
+#     for i in range(100):
+#         (obs, rew, end, info) = env.step([0, 0, 0, 0, 0]) # NOOP until green light
+#         if render:
+#             env.render()
+#         time.sleep(0.2)
 
-    print("GO! ...drive straight as fast as possible...")
-    start = time.time()
-    rews = []
-    obs = None
-    steps = 0
-    for i in range(100):
-        # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
-        (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
-        if end:
-            print("isch over", i)
-            break
-        # print("rew:", rew)
-        if render:
-            env.render()
-        # time.sleep(0.02)
-        time.sleep(0.2)
-        rews.append(rew)
-print(f"resetting env {rc} times took ", time.time() - start, "seconds!")
+#     print("GO! ...drive straight as fast as possible...")
+#     start = time.time()
+#     rews = []
+#     obs = None
+#     steps = 0
+#     for i in range(100):
+#         # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
+#         (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
+#         if end:
+#             print("isch over", i)
+#             break
+#         # print("rew:", rew)
+#         if render:
+#             env.render()
+#         # time.sleep(0.02)
+#         time.sleep(0.2)
+#         rews.append(rew)
+# print(f"resetting env {rc} times took ", time.time() - start, "seconds!")
 # print("Doughnuts!!")
 # for i in range(10000):
 #     if i % 100 == 0:

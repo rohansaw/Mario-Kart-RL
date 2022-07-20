@@ -72,7 +72,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=True, base_episode_length=500, episode_length_increase=10):
+    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=True, base_episode_length=500, episode_length_increase=1):
         
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
@@ -193,7 +193,7 @@ class Mupen64PlusEnv(gym.Env):
         if self.step_count >= self.episode_length:
             self.episode_over = True
         else:
-            self.episode_over = self._evaluate_end_state()
+            self.episode_completed = self._evaluate_end_state()
         # # end = time.time()
         # print("_evaluate_end_state time:", end - start)
         # # start = time.time()
@@ -204,7 +204,7 @@ class Mupen64PlusEnv(gym.Env):
         self.step_count += 1
         # if self.episode_over:
         self.episode_reward += reward
-        return obs, reward, self.episode_over, {}
+        return obs, reward, self.episode_over or self.episode_completed, {}
 
     def _act(self, action, count=1, force_count=False):
         # print("got action:", action, "count:", count)
@@ -266,6 +266,7 @@ class Mupen64PlusEnv(gym.Env):
         cprint('Reset called!', 'yellow')
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
+        cprint(f"last reward: {self.episode_reward}", "green")
         self.episode_reward = 0
         if self.reset_count > 1 and self.variable_episode_length:
             self.episode_length += self.episode_length_increase

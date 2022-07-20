@@ -11,7 +11,8 @@ import wandb
 from gym.envs import registry
 from wandb.integration.sb3 import WandbCallback
 
-WANDB = False
+# WANDB = False
+WANDB = True
 
 if __name__ == "__main__":
     steps = 10_000_000
@@ -35,7 +36,7 @@ if __name__ == "__main__":
             # time.sleep(11 * i)
             env = gym.make(mario_kart_envs[i])
             env.seed(seed + 2 ** i)
-            # env = Monitor(env)
+            env = Monitor(env)
             return env
         set_random_seed(seed)
         return f
