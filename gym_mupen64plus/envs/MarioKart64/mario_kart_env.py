@@ -75,7 +75,7 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS__CONSIDERED_STUCK = 8
+    AMOUNT_STEPS_CONSIDERED_STUCK = 25
     
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -186,6 +186,11 @@ class MarioKartEnv(Mupen64PlusEnv):
     def reset(self):
         return self._reset()
 
+    def _save_last_progress_point(self, idx):
+        if len(self._last_progresses) >=self.AMOUNT_STEPS_CONSIDERED_STUCK: 
+            self._last_progresses.pop(0)
+        self._last_progresses.append(idx)
+
     def _get_progress(self):
         idx = self._last_progress_point
         value_of_last_progress_point = self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]])
@@ -199,7 +204,6 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if idx == self._last_progress_point:
                     print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
                     self._last_progress_point = 0
-                    self._last_progresses = []
                     return -1.0
                 if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) == self.lap:
                     break
@@ -209,7 +213,6 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if idx == self._last_progress_point:
                     print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
                     self._last_progress_point = 0
-                    self._last_progresses = []
                     return - 1.0
                 if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) != self.lap:
                     break
@@ -219,7 +222,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         if abs(dist) > (len(self.CHECKPOINT_LOCATIONS) // 2):
             dist = len(self.CHECKPOINT_LOCATIONS) - abs(dist)
         self._last_progress_point = idx
-        self.save_last_progress_point(idx)
+        self._save_last_progress_point(idx)
         return dist * self.PROGRESS_SCALE
 
     def _get_reward(self):
@@ -323,12 +326,18 @@ class MarioKartEnv(Mupen64PlusEnv):
         return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
     def _is_stuck(self):
-        if len(self._last_progresses < self.AMOUNT_STEPS__CONSIDERED_STUCK):
+        '''If progress of last x steps is smaller than treshhold, we are stuck'''
+        if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
-        return sum(self.last_progresses) < 100
+        return (sum(self._last_progresses) / len(self._last_progresses))- min(self._last_progresses) <= 2
+
+    def _went_backwards(self):
+        return not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1))
 
     def _evaluate_end_state(self):
-        if self._is_stuck():
+        print(self._is_stuck())
+        print(self._last_progresses)
+        if self._is_stuck() or self._went_backwards():
             return True
         end_pixel = self.END_PIXELS[self.res_w]
         return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions

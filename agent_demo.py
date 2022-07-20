@@ -22,7 +22,7 @@ start = time.time()
 rews = []
 obs = None
 steps = 0
-for i in range(300):
+for i in range(500):
     # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
     (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
     if end:
