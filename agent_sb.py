@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=learning_rate, n_steps=n_steps,
                 gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
-    model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, model_save_freq=100000) if WANDB else None)
+    model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, model_save_path="models/", model_save_freq=100000) if WANDB else None)
     model.save("models/mk__a2c_cnn_1kk_reset_impl")
     wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")
     obs = env.reset()

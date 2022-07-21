@@ -332,15 +332,28 @@ class MarioKartEnv(Mupen64PlusEnv):
         '''If progress of last x steps is smaller than treshhold, we are stuck'''
         if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
-        return (sum(self._last_progresses) / len(self._last_progresses))- min(self._last_progresses) <= self.MIN_PROGRESS
+        if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
+            cprint("aborting because stuck!", "cyan")
+            return True
+        return False
+            
 
     def _went_backwards(self):
-        return not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1))
+        if not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1)):
+            cprint("aborting because went backwards!", "cyan")
+            return True
+        return False
+
+    def _not_started_driving(self):
+        if self.step_count > 500 and sum(self._last_progresses) < self.MIN_PROGRESS:
+            cprint("aborting because not started driving", "cyan")
+            return True
+        return False
 
     def _evaluate_end_state(self):
         # print(self._is_stuck())
         # print(self._last_progresses)
-        abort_episode = self._is_stuck() or self._went_backwards()
+        abort_episode = self._is_stuck() or self._went_backwards() or self._not_started_driving()
         end_pixel = self.END_PIXELS[self.res_w]
         completed_episode = self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
         return completed_episode, abort_episode
