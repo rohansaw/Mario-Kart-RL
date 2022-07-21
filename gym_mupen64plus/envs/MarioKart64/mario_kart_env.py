@@ -248,9 +248,9 @@ class MarioKartEnv(Mupen64PlusEnv):
             reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
             reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
         self.last_known_lap = cur_lap
-        print("reward:", reward_to_return)
-        if reward_to_return > 1000:
-            print("whaaa?")
+        # print("reward:", reward_to_return)
+        # if reward_to_return > 1000:
+        #     print("whaaa?")
         return reward_to_return
 
     def _get_lap(self):
@@ -338,8 +338,8 @@ class MarioKartEnv(Mupen64PlusEnv):
         return not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1))
 
     def _evaluate_end_state(self):
-        print(self._is_stuck())
-        print(self._last_progresses)
+        # print(self._is_stuck())
+        # print(self._last_progresses)
         abort_episode = self._is_stuck() or self._went_backwards()
         end_pixel = self.END_PIXELS[self.res_w]
         completed_episode = self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
