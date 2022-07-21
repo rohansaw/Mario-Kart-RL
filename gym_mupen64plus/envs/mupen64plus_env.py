@@ -2,7 +2,6 @@ from PIL import Image
 from pathlib import Path
 import sys
 import socket
-from ilock import ILock
 
 PY3_OR_LATER = sys.version_info[0] >= 3
 
@@ -91,7 +90,8 @@ class Mupen64PlusEnv(gym.Env):
         self.reset_count = 0
         self.step_count = 0
         self.running = True
-        self.episode_over = False
+        self.episode_aborted = False
+        self.episode_completed = False
         self.episode_reward = 0
         self.last_episode_reward = 0
         self.pixel_array = None
@@ -192,9 +192,11 @@ class Mupen64PlusEnv(gym.Env):
         # print("observe time:", end - start)
         # # start = time.time()
         if self.step_count >= self.episode_length:
-            self.episode_over = True
+            cprint("aborting episode due to max steps reached!", "cyan")
+            self.episode_aborted = True
+            self.episode_completed = False
         else:
-            self.episode_completed = self._evaluate_end_state()
+            self.episode_completed, self.episode_aborted = self._evaluate_end_state()
         # # end = time.time()
         # print("_evaluate_end_state time:", end - start)
         # # start = time.time()
@@ -205,7 +207,15 @@ class Mupen64PlusEnv(gym.Env):
         self.step_count += 1
         # if self.episode_over:
         self.episode_reward += reward
-        return obs, reward, self.episode_over or self.episode_completed, {}
+        
+        if self.gray_scale:
+            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True)
+            # self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
+        if self.episode_aborted:
+            cprint("Episode aborted!", "cyan")
+        if self.episode_completed:
+            cprint("Episode successfully completed!", "cyan")
+        return obs, reward, self.episode_aborted or self.episode_completed, {}
 
     def _act(self, action, count=1, force_count=False):
         # print("got action:", action, "count:", count)
@@ -246,8 +256,6 @@ class Mupen64PlusEnv(gym.Env):
     
         # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
         self.pixel_array = np.flip(image_array[:, :, :3], 2)
-        if self.gray_scale:
-            self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
         return self.pixel_array
 
     @abc.abstractmethod
@@ -262,7 +270,7 @@ class Mupen64PlusEnv(gym.Env):
     @abc.abstractmethod
     def _evaluate_end_state(self):
         #cprint('Evaluate End State called!', 'yellow')
-        return False
+        return False, False
 
     @abc.abstractmethod
     def _reset(self):

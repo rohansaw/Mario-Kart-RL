@@ -75,7 +75,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS_CONSIDERED_STUCK = 25
+    AMOUNT_STEPS_CONSIDERED_STUCK = 40
+    MIN_PROGRESS = 1.5
     
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -179,7 +180,7 @@ class MarioKartEnv(Mupen64PlusEnv):
                 else:
                     self._reset_during_race()
 
-        self.episode_over = False
+        self.episode_aborted = False
         self.episode_complete = False
         return super(MarioKartEnv, self)._reset()
 
@@ -233,6 +234,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         cur_lap = self._get_lap()
 
         if self.episode_completed:
+            cprint("yayy, race completed!!")
             # Scale out the end reward based on the total steps to get here; the fewer steps, the higher the reward
             reward_to_return = 5 * (1250 - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
         else:
@@ -246,7 +248,7 @@ class MarioKartEnv(Mupen64PlusEnv):
             reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
             reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
         self.last_known_lap = cur_lap
-        # print("reward:", reward_to_return)
+        print("reward:", reward_to_return)
         if reward_to_return > 1000:
             print("whaaa?")
         return reward_to_return
@@ -330,7 +332,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         '''If progress of last x steps is smaller than treshhold, we are stuck'''
         if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
-        return (sum(self._last_progresses) / len(self._last_progresses))- min(self._last_progresses) <= 2
+        return (sum(self._last_progresses) / len(self._last_progresses))- min(self._last_progresses) <= self.MIN_PROGRESS
 
     def _went_backwards(self):
         return not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1))
@@ -338,10 +340,10 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _evaluate_end_state(self):
         print(self._is_stuck())
         print(self._last_progresses)
-        if self._is_stuck() or self._went_backwards():
-            return True
+        abort_episode = self._is_stuck() or self._went_backwards()
         end_pixel = self.END_PIXELS[self.res_w]
-        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
+        completed_episode = self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
+        return completed_episode, abort_episode
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')

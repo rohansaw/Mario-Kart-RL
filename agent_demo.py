@@ -22,7 +22,7 @@ start = time.time()
 rews = []
 obs = None
 steps = 0
-for i in range(500):
+for i in range(300):
     # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
     (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
     if end:
@@ -33,36 +33,36 @@ for i in range(500):
         env.render()
     time.sleep(0.02)
     rews.append(rew)
-# print("steps:", i)
-# steps += i
-# print("now left")
-# for i in range(270):
-#     # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
-#     (obs, rew, end, info) = env.step([-40,   0, 1, 0, 0]) # Drive straight
-#     if end:
-#         print("isch over", i)
-#         break
-#     # print("rew:", rew)
-#     if render:
-#         env.render()
-#     # time.sleep(0.02)
-#     rews.append(rew)
-# print("steps:", i)
+print("steps:", i)
+steps += i
+print("now left")
+for i in range(270):
+    # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
+    (obs, rew, end, info) = env.step([-40,   0, 1, 0, 0]) # Drive straight
+    if end:
+        print("isch over", i)
+        break
+    # print("rew:", rew)
+    if render:
+        env.render()
+    time.sleep(0.02)
+    rews.append(rew)
+print("steps:", i)
 
-# steps += i
-# print("now straight")
-# for i in range(500):
-#     # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
-#     (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
-#     if end:
-#         print("isch over", i)
-#         break
-#     # print("rew:", rew, "sum:", sum(rews))
-#     if render:
-#         env.render()
-#     # time.sleep(0.02)
+steps += i
+print("now straight")
+for i in range(500):
+    # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
+    (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
+    if end:
+        print("isch over", i)
+        break
+    # print("rew:", rew, "sum:", sum(rews))
+    if render:
+        env.render()
+    time.sleep(0.02)
     
-#     rews.append(rew)
+    rews.append(rew)
 
 # print("steps:", i)
 # steps += i
