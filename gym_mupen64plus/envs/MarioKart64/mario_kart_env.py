@@ -110,6 +110,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         
         self.random_tracks = random_tracks
         self.lap = 0
+        self.total_progress = 0
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
 
@@ -163,11 +164,12 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=46, wait_for='race to load')
 
     def _reset(self):
-        wandb.log({"env/laps": self.lap})
+        wandb.log({"env/laps": self.lap, "env/progress": self.total_progress, "env/prog_per_step": self.total_progress / self.step_count})
         self.lap = 0
         self.step_count_at_lap = 0
         self._last_progress_point = 0
         self.last_known_lap = -1
+        self.total_progress = 0
         self._last_progresses = []
 
 
@@ -248,6 +250,7 @@ class MarioKartEnv(Mupen64PlusEnv):
                 # Scale out the lap reward based on the steps to get here; the fewer steps, the higher the reward
                 reward_to_return = self.LAP_REWARD # TODO: Figure out a good scale here... number of steps required per lap will vary depending on the course; don't want negative reward for completing a lap
             progress = self._get_progress()
+            self.total_progress += progress
             reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
             reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
         self.last_known_lap = cur_lap
@@ -335,22 +338,22 @@ class MarioKartEnv(Mupen64PlusEnv):
             return False
         if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
             cprint("aborting because stuck!", "cyan")
-            wandb.log({"env/episode-stop-reason": "stuck"})
+            wandb.log({"env/episode-stop-reason": 0})
             return True
         return False
-            
+
 
     def _went_backwards(self):
         if not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1)):
             cprint("aborting because went backwards!", "cyan")
-            wandb.log({"env/episode-stop-reason": "went backwards"})
+            wandb.log({"env/episode-stop-reason": 1})
             return True
         return False
 
     def _not_started_driving(self):
         if self.step_count > 300 and self.step_count < 500 and sum(self._last_progresses) < self.MIN_PROGRESS:
             cprint("aborting because not started driving", "cyan")
-            wandb.log({"env/episode-stop-reason": "not started driving"})
+            wandb.log({"env/episode-stop-reason": 2})
             return True
         return False
 

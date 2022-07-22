@@ -13,7 +13,7 @@ from wandb.integration.sb3 import WandbCallback
 
 # WANDB = False
 WANDB = True
-VIDEO_RECORD_FREQUENCY = 20
+VIDEO_RECORD_FREQUENCY = 10
 
 if __name__ == "__main__":
     steps = 10_000_000

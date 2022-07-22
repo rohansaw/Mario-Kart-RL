@@ -218,6 +218,7 @@ class Mupen64PlusEnv(gym.Env):
             cprint("Episode aborted!", "cyan")
         if self.episode_completed:
             cprint("Episode successfully completed!", "cyan")
+            wandb.log({"env/episode-stop-reason": 3})
         return obs, reward, self.episode_aborted or self.episode_completed, {}
 
     def _act(self, action, count=1, force_count=False):
@@ -280,6 +281,7 @@ class Mupen64PlusEnv(gym.Env):
         cprint('Reset called!', 'yellow')
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
+        
         self.max_reward = max(self.max_reward, self.episode_reward)
         self.max_duration = max(self.max_duration, self.step_count)
         cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}", "green")
