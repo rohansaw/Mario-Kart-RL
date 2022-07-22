@@ -11,6 +11,7 @@ from gym import spaces
 from gym_mupen64plus.envs.mupen64plus_env \
   import Mupen64PlusEnv, ControllerState, IMAGE_HELPER
 import numpy as np
+import wandb
 
 ###############################################
 class MarioKartEnv(Mupen64PlusEnv):
@@ -108,6 +109,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.action_space = spaces.MultiDiscrete([len(action) for action in actions])
         
         self.random_tracks = random_tracks
+        self.lap = 0
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
 
@@ -161,6 +163,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=46, wait_for='race to load')
 
     def _reset(self):
+        wandb.log({"env/laps": self.lap})
         self.lap = 0
         self.step_count_at_lap = 0
         self._last_progress_point = 0
@@ -320,11 +323,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         # If the first pixel is not a valid color, no need to check the other three
         if not checkpoint_pixels[0] in self.HUD_PROGRESS_COLOR_VALUES:
             return -1
-        # print("first is in")
         # If the first pixel is good, make sure the other three match
         if not self.all_equal(checkpoint_pixels):
             return -1
-        # print("all equal")
         # If all are good, return the corresponding value
         return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
@@ -334,6 +335,7 @@ class MarioKartEnv(Mupen64PlusEnv):
             return False
         if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
             cprint("aborting because stuck!", "cyan")
+            wandb.log({"env/episode-stop-reason": "stuck"})
             return True
         return False
             
@@ -341,12 +343,14 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _went_backwards(self):
         if not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1)):
             cprint("aborting because went backwards!", "cyan")
+            wandb.log({"env/episode-stop-reason": "went backwards"})
             return True
         return False
 
     def _not_started_driving(self):
-        if self.step_count > 500 and sum(self._last_progresses) < self.MIN_PROGRESS:
+        if self.step_count > 300 and self.step_count < 500 and sum(self._last_progresses) < self.MIN_PROGRESS:
             cprint("aborting because not started driving", "cyan")
+            wandb.log({"env/episode-stop-reason": "not started driving"})
             return True
         return False
 

@@ -7,6 +7,7 @@ PY3_OR_LATER = sys.version_info[0] >= 3
 
 
 import abc
+import wandb
 import array
 from contextlib import contextmanager
 import inspect
@@ -94,6 +95,8 @@ class Mupen64PlusEnv(gym.Env):
         self.episode_completed = False
         self.episode_reward = 0
         self.last_episode_reward = 0
+        self.max_duration = 0
+        self.max_reward = 0
         self.pixel_array = None
         self.gray_scale = gray_scale
         self._base_load_config()
@@ -277,7 +280,16 @@ class Mupen64PlusEnv(gym.Env):
         cprint('Reset called!', 'yellow')
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
-        cprint(f"last reward: {self.episode_reward}", "green")
+        self.max_reward = max(self.max_reward, self.episode_reward)
+        self.max_duration = max(self.max_duration, self.step_count)
+        cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}", "green")
+
+        wandb.log({
+            "env/rewards": self.episode_reward,
+            "env/length": self.step_count,
+            "env/max-reward": self.max_reward,
+            "env/max-duration": self.max_duration,
+        })
         self.episode_reward = 0
         if self.reset_count > 1 and self.variable_episode_length:
             self.episode_length += self.episode_length_increase
