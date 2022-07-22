@@ -111,6 +111,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.random_tracks = random_tracks
         self.lap = 0
         self.total_progress = 0
+        self.step_count = 0
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
 
@@ -164,7 +165,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=46, wait_for='race to load')
 
     def _reset(self):
-        wandb.log({"env/laps": self.lap, "env/progress": self.total_progress, "env/prog_per_step": self.total_progress / self.step_count})
+        if self.step_count > 0:
+            if wandb.run is not None:
+                wandb.log({"env/laps": self.lap, "env/progress": self.total_progress, "env/prog_per_step": self.total_progress / self.step_count})
         self.lap = 0
         self.step_count_at_lap = 0
         self._last_progress_point = 0

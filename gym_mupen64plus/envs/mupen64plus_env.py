@@ -142,7 +142,7 @@ class Mupen64PlusEnv(gym.Env):
             self._navigate_menu()
 
         self.observation_space = \
-            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, SCR_D), dtype=np.uint8)
+            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, 1), dtype=np.uint8)
 
         actions = [[-80, 80], # Joystick X-axis
                                                   [-80, 80], # Joystick Y-axis
@@ -212,13 +212,14 @@ class Mupen64PlusEnv(gym.Env):
         self.episode_reward += reward
         
         if self.gray_scale:
-            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True)
+            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
             # self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
         if self.episode_aborted:
             cprint("Episode aborted!", "cyan")
         if self.episode_completed:
             cprint("Episode successfully completed!", "cyan")
-            wandb.log({"env/episode-stop-reason": 3})
+            if wandb.run is not None:
+                wandb.log({"env/episode-stop-reason": 3})
         return obs, reward, self.episode_aborted or self.episode_completed, {}
 
     def _act(self, action, count=1, force_count=False):
@@ -285,13 +286,14 @@ class Mupen64PlusEnv(gym.Env):
         self.max_reward = max(self.max_reward, self.episode_reward)
         self.max_duration = max(self.max_duration, self.step_count)
         cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}", "green")
-
-        wandb.log({
-            "env/rewards": self.episode_reward,
-            "env/length": self.step_count,
-            "env/max-reward": self.max_reward,
-            "env/max-duration": self.max_duration,
-        })
+        
+        if wandb.run is not None:
+            wandb.log({
+                "env/rewards": self.episode_reward,
+                "env/length": self.step_count,
+                "env/max-reward": self.max_reward,
+                "env/max-duration": self.max_duration,
+            })
         self.episode_reward = 0
         if self.reset_count > 1 and self.variable_episode_length:
             self.episode_length += self.episode_length_increase
@@ -299,7 +301,10 @@ class Mupen64PlusEnv(gym.Env):
         
 
         self.step_count = 0
-        return self._observe()
+        obs = self._observe()
+        if self.gray_scale:
+            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
+        return obs
 
     def _render(self, mode='human', close=False):
         if close:

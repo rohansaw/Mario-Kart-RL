@@ -13,7 +13,7 @@ from gym.envs import registry
 from wandb.integration.sb3 import WandbCallback
 
 # WANDB = False
-WANDB = True
+WANDB = False
 VIDEO_RECORD_FREQUENCY = 10
 
 if __name__ == "__main__":
@@ -37,6 +37,7 @@ if __name__ == "__main__":
         def f():
             env = gym.make(mario_kart_envs[i])
             env.seed(seed + 2 ** i)
+            print("CHECKING ENV")
             check_env(env)
             env = Monitor(env)
             env = gym.wrappers.RecordVideo(env, "./recordings", episode_trigger=lambda x: x % VIDEO_RECORD_FREQUENCY == 0)
