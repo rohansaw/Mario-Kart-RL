@@ -61,14 +61,14 @@ class MarioKartEnv(Mupen64PlusEnv):
     }
 
     DEFAULT_STEP_REWARD = -0.1
-    LAP_REWARD = 500
+    LAP_REWARD = 300
     CHECKPOINT_REWARD = 0.5
     BACKWARDS_PUNISHMENT = 3
     END_REWARD = 1000
     APPROX_MAX_STEP_COUNT = 5000
     
     PROGRESS_SCALE = 1
-    PROGRESS_REWARD = 1.0
+    PROGRESS_REWARD = 2.0
 
     END_EPISODE_THRESHOLD = 0
 
@@ -360,7 +360,7 @@ class MarioKartEnv(Mupen64PlusEnv):
 
 
     def _went_backwards(self):
-        if not all(self._last_progresses[i] <= self._last_progresses[i+1] for i in range(len(self._last_progresses) - 1)):
+        if not all(self._last_progresses[i] <= self._last_progresses[i+5] for i in range(len(self._last_progresses) - 5)):
             cprint("aborting because went backwards!", "cyan")
             if wandb.run is not None:
                 wandb.log({"env/episode-stop-reason": 1})
