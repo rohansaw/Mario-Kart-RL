@@ -1,3 +1,4 @@
+from enum import auto
 from PIL import Image
 from pathlib import Path
 import sys
@@ -72,7 +73,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
+    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
         
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
@@ -93,10 +94,12 @@ class Mupen64PlusEnv(gym.Env):
         self.running = True
         self.episode_aborted = False
         self.episode_completed = False
+        self.auto_abort = auto_abort
         self.episode_reward = 0
         self.last_episode_reward = 0
         self.max_duration = 0
         self.max_reward = 0
+        self.total_progress = 0
         self.pixel_array = None
         self.gray_scale = gray_scale
         self._base_load_config()
@@ -200,6 +203,9 @@ class Mupen64PlusEnv(gym.Env):
             self.episode_completed = False
         else:
             self.episode_completed, self.episode_aborted = self._evaluate_end_state()
+        
+        if not self.auto_abort:
+            self.episode_aborted = False
         # # end = time.time()
         # print("_evaluate_end_state time:", end - start)
         # # start = time.time()
@@ -285,7 +291,7 @@ class Mupen64PlusEnv(gym.Env):
         
         self.max_reward = max(self.max_reward, self.episode_reward)
         self.max_duration = max(self.max_duration, self.step_count)
-        cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}", "green")
+        cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
         
         if wandb.run is not None:
             wandb.log({

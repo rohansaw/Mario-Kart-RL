@@ -13,7 +13,7 @@ from gym.envs import registry
 from wandb.integration.sb3 import WandbCallback
 
 # WANDB = False
-WANDB = False
+WANDB = True
 VIDEO_RECORD_FREQUENCY = 10
 
 if __name__ == "__main__":
