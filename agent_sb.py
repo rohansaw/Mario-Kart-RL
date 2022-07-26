@@ -1,6 +1,7 @@
 from multiprocessing.dummy import DummyProcess
 import gym, gym_mupen64plus
 import time
+import os
 
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.env_util import make_vec_env
@@ -13,6 +14,7 @@ from wandb.integration.sb3 import WandbCallback
 
 # WANDB = False
 WANDB = True
+os.environ['DISPLAY'] = ':0'
 
 if __name__ == "__main__":
     steps = 10_000_000
