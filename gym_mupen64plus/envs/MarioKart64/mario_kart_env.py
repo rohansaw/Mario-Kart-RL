@@ -140,7 +140,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         return super(MarioKartEnv, self)._step(controls)
 
     def _reset_after_race(self):
-        # print("resetting after race")
+        print("resetting after race")
         self._wait(count=275, wait_for='times screen')
         self._navigate_post_race_menu()
         self._wait(count=40, wait_for='map select screen')
@@ -148,7 +148,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=50, wait_for='race to load')
 
     def _reset_during_race(self):
-        # print("resetting during race")
+        print("resetting during race")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -159,7 +159,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=80, wait_for='race to load')
     
     def _reset_during_race_change_course(self):
-        # print("resetting during race CHANGING COURSE")
+        print("resetting during race CHANGING COURSE")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -184,7 +184,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.last_known_lap = -1
         self._last_progresses = []
 
-
+        print(self.episode_completed)
         # Nothing to do on the first call to reset()
         if self.reset_count > 0:
             # Make sure we don't skip frames while navigating the menus
@@ -192,13 +192,13 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if self.random_tracks:
                     self._set_course(random.choice(list(self.COURSES.keys())))
                     self._reset_during_race_change_course()
-                elif self.episode_complete:
+                elif self.episode_completed:
                     self._reset_after_race()
                 else:
                     self._reset_during_race()
 
         self.episode_aborted = False
-        self.episode_complete = False
+        self.episode_completed = False
         reset_obs = super(MarioKartEnv, self)._reset()
         self.total_progress = 0
         
@@ -256,7 +256,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         if self.episode_completed:
             cprint("yayy, race completed!!")
             # Scale out the end reward based on the total steps to get here; the fewer steps, the higher the reward
-            reward_to_return = 5 * (self.APPROX_MAX_STEP_COUNT - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
+            reward_to_return = (self.APPROX_MAX_STEP_COUNT - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
         else:
             if cur_lap > self.lap:
                 self.lap = cur_lap
