@@ -16,6 +16,8 @@ from wandb.integration.sb3 import WandbCallback
 WANDB = True
 VIDEO_RECORD_FREQUENCY = 10
 
+SEED = 123
+
 if __name__ == "__main__":
     steps = 10_000_000
     learning_rate = 3e-4
@@ -33,7 +35,7 @@ if __name__ == "__main__":
     else:
         run_id = "run"
     mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
-    def make_env(i, seed=0):
+    def make_env(i, seed=SEED):
         def f():
             env = gym.make(mario_kart_envs[i])
             env.seed(seed + 2 ** i)
@@ -55,7 +57,7 @@ if __name__ == "__main__":
         return result
 
     model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=learning_rate, n_steps=n_steps,
-                gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs)
+                gamma=gamma, gae_lambda=gae_lambda, batch_size=batch_size, n_epochs=n_epochs, seed=SEED)
     model.learn(total_timesteps=steps, callback=WandbCallback(verbose=2, model_save_path=f"models/{run_id}", model_save_freq=100000) if WANDB else None)
     model.save("models/mk__a2c_cnn_1kk_reset_impl")
     wandb.save(f"models/mk__a2c_cnn_1kk_reset_impl")

@@ -140,7 +140,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         return super(MarioKartEnv, self)._step(controls)
 
     def _reset_after_race(self):
-        print("resetting after race")
+        # print("resetting after race")
         self._wait(count=275, wait_for='times screen')
         self._navigate_post_race_menu()
         self._wait(count=40, wait_for='map select screen')
@@ -148,7 +148,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=50, wait_for='race to load')
 
     def _reset_during_race(self):
-        print("resetting during race")
+        # print("resetting during race")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -159,7 +159,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=80, wait_for='race to load')
     
     def _reset_during_race_change_course(self):
-        print("resetting during race CHANGING COURSE")
+        # print("resetting during race CHANGING COURSE")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -184,7 +184,6 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.last_known_lap = -1
         self._last_progresses = []
 
-        print(self.episode_completed)
         # Nothing to do on the first call to reset()
         if self.reset_count > 0:
             # Make sure we don't skip frames while navigating the menus
