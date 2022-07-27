@@ -3,7 +3,6 @@ numpy
 PyYAML
 termcolor
 mss
-torch
 torchvision
 stable-baselines3
 wandb
