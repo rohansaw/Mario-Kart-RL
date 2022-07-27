@@ -1,12 +1,13 @@
 #!/bin/python
 from curses.ascii import DEL
+from pathlib import Path
 from PIL import Image
 import time
 import gym, gym_mupen64plus
 from gym_mupen64plus.envs.mupen64plus_env import COUNTPEROP, IMAGE_HELPER
 
-# render = False
-render = True
+render = False
+# render = True
 env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0', auto_abort=False, resolution="supersmall", base_episode_length=30000)
 # env.reset()
 # if render:
@@ -47,6 +48,7 @@ obs = None
 steps = 0
 obs = None
 total_steps = 100
+Path("images").mkdir(parents=True, exist_ok=True)
 
 for j in range(2):
     env.reset()

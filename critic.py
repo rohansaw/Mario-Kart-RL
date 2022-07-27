@@ -1,7 +1,7 @@
 from torch.nn import Module
 import torch.nn as nn
-from bitorch.layers import ShapePrintDebug
-from bitorch.layers.config import config
+#from bitorch.layers import ShapePrintDebug
+#from bitorch.layers.config import config
 
 # class SimpleCritic(Module):
 #     def __init__(self, input_size):
@@ -60,7 +60,7 @@ class BigCritic(Module):
         
         num_channels = input_size[2]
         self.convolution = nn.Sequential(
-            ShapePrintDebug(debug_interval=1, name="input"),
+#            ShapePrintDebug(debug_interval=1, name="input"),
             nn.Conv2d(num_channels, 32, kernel_size=4, padding=1, stride=2),
             nn.ReLU(), # max(0, x)
             nn.Conv2d(32, 64, kernel_size=4, padding=1, stride=2),

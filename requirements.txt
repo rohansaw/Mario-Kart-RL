@@ -3,10 +3,9 @@ numpy
 PyYAML
 termcolor
 mss
-torchvision
 stable-baselines3
 wandb
 tensorboard            
-bitorch
+#bitorch
 wandb
-ilock
+

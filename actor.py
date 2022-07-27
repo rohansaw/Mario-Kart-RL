@@ -1,9 +1,9 @@
 from torch.nn import Module
 import torch.nn as nn
 import torch
-from bitorch.layers import ShapePrintDebug, InputPrintDebug, WeightPrintDebug
+#from bitorch.layers import ShapePrintDebug, InputPrintDebug, WeightPrintDebug
 
-from bitorch.layers.config import config
+#from bitorch.layers.config import config
 
 class SmolActor(Module):
     def __init__(self, input_size, output_size):
@@ -44,7 +44,7 @@ class BigActor(Module):
         
         num_channels = input_size[2]
         self.convolution = nn.Sequential(
-            ShapePrintDebug(debug_interval=1, name="input"),
+ #           ShapePrintDebug(debug_interval=1, name="input"),
             nn.Conv2d(num_channels, 32, kernel_size=4, padding=1, stride=2),
             nn.ReLU(), # max(0, x)
             nn.Conv2d(32, 64, kernel_size=4, padding=1, stride=2),
