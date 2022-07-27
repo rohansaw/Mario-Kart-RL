@@ -86,7 +86,7 @@ class MarioKartAgent():
         self.env = gym.wrappers.RecordVideo(self.env, "./recordings", episode_trigger=lambda x: x % visualize_every == 0)
 
         # input_size = (30, 40, 3)
-        input_size = (60, 80, 3)
+        input_size = (60, 80, 1)
         self.actor = SmolActor(input_size=input_size,
                                  output_size=self.env.action_space.n)
         self.critic = SmolCritic(input_size=input_size)
@@ -139,7 +139,10 @@ class MarioKartAgent():
     def select_action(self, context, step):
         '''Returns one-hot encoded action to play next and log_prob of this action in the distribution'''
         input_values = context.get_context()
+        print("forwarding...")
         probs = self.actor(input_values)
+        print("...")
+        
         if step % self.step_size == 0:
             wandb.log({
                 "action_probs": wandb.Histogram(probs.detach().squeeze().cpu().numpy()), 
@@ -242,14 +245,14 @@ class MarioKartAgent():
             buffer.reset()
             episode_reward = 0
             context = Context(self._transform_state(state).shape, self.context_size, self.device)
-            logging.info(f"------ episode {episode_num} ------")
-            logging.info("phase 1") # NOOP until green light
+            print(f"------ episode {episode_num} ------")
+            print("phase 1") # NOOP until green light
             for _ in range(100):
                 (obs, rew, end, info) = self.step(0)
                 context.add(self._transform_state(obs))
                 self.conditional_render()
 
-            logging.info("phase 2") # Train actor and critic networks
+            print("phase 2") # Train actor and critic networks
             self.actor.reset_model()
             terminated_during_run = False
             raw_rewards = []
