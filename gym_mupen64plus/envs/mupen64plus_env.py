@@ -1,13 +1,14 @@
+from enum import auto
 from PIL import Image
 from pathlib import Path
 import sys
 import socket
-from ilock import ILock
 
 PY3_OR_LATER = sys.version_info[0] >= 3
 
 
 import abc
+import wandb
 import array
 from contextlib import contextmanager
 import inspect
@@ -72,7 +73,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, variable_episode_length=True, base_episode_length=500, episode_length_increase=1):
+    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
         
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
@@ -91,10 +92,16 @@ class Mupen64PlusEnv(gym.Env):
         self.reset_count = 0
         self.step_count = 0
         self.running = True
-        self.episode_over = False
+        self.episode_aborted = False
+        self.episode_completed = False
+        self.auto_abort = auto_abort
         self.episode_reward = 0
         self.last_episode_reward = 0
+        self.max_duration = 0
+        self.max_reward = 0
+        self.total_progress = 0
         self.pixel_array = None
+        self.gray_scale = gray_scale
         self._base_load_config()
         self._base_validate_config()
         self.frame_skip = self.config['FRAME_SKIP']
@@ -138,7 +145,7 @@ class Mupen64PlusEnv(gym.Env):
             self._navigate_menu()
 
         self.observation_space = \
-            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, SCR_D), dtype=np.uint8)
+            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, 1), dtype=np.uint8)
 
         actions = [[-80, 80], # Joystick X-axis
                                                   [-80, 80], # Joystick Y-axis
@@ -191,9 +198,14 @@ class Mupen64PlusEnv(gym.Env):
         # print("observe time:", end - start)
         # # start = time.time()
         if self.step_count >= self.episode_length:
-            self.episode_over = True
+            cprint("aborting episode due to max steps reached!", "cyan")
+            self.episode_aborted = True
+            self.episode_completed = False
         else:
-            self.episode_completed = self._evaluate_end_state()
+            self.episode_completed, self.episode_aborted = self._evaluate_end_state()
+        
+        if not self.auto_abort:
+            self.episode_aborted = False
         # # end = time.time()
         # print("_evaluate_end_state time:", end - start)
         # # start = time.time()
@@ -204,7 +216,17 @@ class Mupen64PlusEnv(gym.Env):
         self.step_count += 1
         # if self.episode_over:
         self.episode_reward += reward
-        return obs, reward, self.episode_over or self.episode_completed, {}
+        
+        if self.gray_scale:
+            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
+            # self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
+        if self.episode_aborted:
+            cprint("Episode aborted!", "cyan")
+        if self.episode_completed:
+            cprint("Episode successfully completed!", "cyan")
+            if wandb.run is not None:
+                wandb.log({"env/episode-stop-reason": 3})
+        return obs, reward, self.episode_aborted or self.episode_completed, {}
 
     def _act(self, action, count=1, force_count=False):
         # print("got action:", action, "count:", count)
@@ -259,14 +281,25 @@ class Mupen64PlusEnv(gym.Env):
     @abc.abstractmethod
     def _evaluate_end_state(self):
         #cprint('Evaluate End State called!', 'yellow')
-        return False
+        return False, False
 
     @abc.abstractmethod
     def _reset(self):
         cprint('Reset called!', 'yellow')
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
-        cprint(f"last reward: {self.episode_reward}", "green")
+        
+        self.max_reward = max(self.max_reward, self.episode_reward)
+        self.max_duration = max(self.max_duration, self.step_count)
+        cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
+        
+        if wandb.run is not None:
+            wandb.log({
+                "env/rewards": self.episode_reward,
+                "env/length": self.step_count,
+                "env/max-reward": self.max_reward,
+                "env/max-duration": self.max_duration,
+            })
         self.episode_reward = 0
         if self.reset_count > 1 and self.variable_episode_length:
             self.episode_length += self.episode_length_increase
@@ -274,7 +307,10 @@ class Mupen64PlusEnv(gym.Env):
         
 
         self.step_count = 0
-        return self._observe()
+        obs = self._observe()
+        if self.gray_scale:
+            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
+        return obs
 
     def _render(self, mode='human', close=False):
         if close:

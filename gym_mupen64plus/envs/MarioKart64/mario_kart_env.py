@@ -11,6 +11,7 @@ from gym import spaces
 from gym_mupen64plus.envs.mupen64plus_env \
   import Mupen64PlusEnv, ControllerState, IMAGE_HELPER
 import numpy as np
+import wandb
 
 ###############################################
 class MarioKartEnv(Mupen64PlusEnv):
@@ -19,8 +20,11 @@ class MarioKartEnv(Mupen64PlusEnv):
     # Indicates the color value of the pixel at point (203, 51)
     # This is where the lap number is present in the default HUD
     END_RACE_PIXEL_COLORS = {"mupen64plus-video-rice.so"       : ( 66,  49,  66),
-                             "mupen64plus-video-glide64mk2.so" : (214, 148, 214),
-                             "mupen64plus-video-glide64.so"    : (157, 112, 158)}
+                             "mupen64plus-video-glide64mk2.so" : (231, 123, 247),
+                             "mupen64plus-video-glide64.so"    : (231, 123, 247)}
+    # END_RACE_PIXEL_COLORS = {"mupen64plus-video-rice.so"       : ( 66,  49,  66),
+    #                          "mupen64plus-video-glide64mk2.so" : (214, 148, 214),
+    #                          "mupen64plus-video-glide64.so"    : (157, 112, 158)}
 
     HUD_PROGRESS_COLOR_VALUES = {(000, 000, 255): 0, #   Blue: Lap 1
                                  (255, 255, 000): 1, # Yellow: Lap 2
@@ -57,13 +61,14 @@ class MarioKartEnv(Mupen64PlusEnv):
     }
 
     DEFAULT_STEP_REWARD = -0.1
-    LAP_REWARD = 200
+    LAP_REWARD = 300
     CHECKPOINT_REWARD = 0.5
     BACKWARDS_PUNISHMENT = 3
     END_REWARD = 1000
+    APPROX_MAX_STEP_COUNT = 5000
     
     PROGRESS_SCALE = 1
-    PROGRESS_REWARD = 1.0
+    PROGRESS_REWARD = 2.0
 
     END_EPISODE_THRESHOLD = 0
 
@@ -73,6 +78,10 @@ class MarioKartEnv(Mupen64PlusEnv):
     MAP_SERIES = 0
     MAP_CHOICE = 0
 
+    ENABLE_CHECKPOINTS = False
+
+    AMOUNT_STEPS_CONSIDERED_STUCK = 40
+    MIN_PROGRESS = 1.5
     
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -83,12 +92,18 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     END_PIXELS = {
         160: [50, 12],
-        170: [60, 18],
-        320: [101, 25],
-        640: [203, 51],
+        170: [52, 16],
+        320: [102, 29],
+        640: [203, 59],
     }
+    # END_PIXELS = {
+    #     160: [50, 12],
+    #     170: [60, 18],
+    #     320: [102, 25],
+    #     640: [203, 51],
+    # }
 
-    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=True, **kwargs):
+    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=False, **kwargs):
         self._set_character(character)
         self._set_course(course)
         super(MarioKartEnv, self).__init__(**kwargs)
@@ -104,6 +119,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.action_space = spaces.MultiDiscrete([len(action) for action in actions])
         
         self.random_tracks = random_tracks
+        self.lap = 0
+        self.total_progress = 0
+        self.step_count = 0
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
 
@@ -119,11 +137,10 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _step(self, action):
         # Interpret the action choice and get the actual controller state for this step
         controls = action + [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-
         return super(MarioKartEnv, self)._step(controls)
 
     def _reset_after_race(self):
-        print("resetting after race")
+        # print("resetting after race")
         self._wait(count=275, wait_for='times screen')
         self._navigate_post_race_menu()
         self._wait(count=40, wait_for='map select screen')
@@ -131,7 +148,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=50, wait_for='race to load')
 
     def _reset_during_race(self):
-        print("resetting during race")
+        # print("resetting during race")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -139,10 +156,10 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._press_button(ControllerState.START_BUTTON)
         self._press_button(ControllerState.JOYSTICK_DOWN)
         self._press_button(ControllerState.A_BUTTON)
-        self._wait(count=76, wait_for='race to load')
+        self._wait(count=80, wait_for='race to load')
     
     def _reset_during_race_change_course(self):
-        print("resetting during race CHANGING COURSE")
+        # print("resetting during race CHANGING COURSE")
         # Can't pause the race until the light turns green
         if (self.step_count * self.controller_server.frame_skip) < 120:
             steps_to_wait = 100 - (self.step_count * self.controller_server.frame_skip)
@@ -158,11 +175,14 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=46, wait_for='race to load')
 
     def _reset(self):
+        if self.step_count > 0:
+            if wandb.run is not None:
+                wandb.log({"env/laps": self.lap, "env/progress": self.total_progress, "env/prog_per_step": self.total_progress / self.step_count})
         self.lap = 0
         self.step_count_at_lap = 0
         self._last_progress_point = 0
         self.last_known_lap = -1
-
+        self._last_progresses = []
 
         # Nothing to do on the first call to reset()
         if self.reset_count > 0:
@@ -171,17 +191,25 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if self.random_tracks:
                     self._set_course(random.choice(list(self.COURSES.keys())))
                     self._reset_during_race_change_course()
-                elif self.episode_complete:
+                elif self.episode_completed:
                     self._reset_after_race()
                 else:
                     self._reset_during_race()
 
-        self.episode_over = False
-        self.episode_complete = False
-        return super(MarioKartEnv, self)._reset()
+        self.episode_aborted = False
+        self.episode_completed = False
+        reset_obs = super(MarioKartEnv, self)._reset()
+        self.total_progress = 0
+        
+        return reset_obs
 
     def reset(self):
         return self._reset()
+
+    def _save_last_progress_point(self, idx):
+        if len(self._last_progresses) >=self.AMOUNT_STEPS_CONSIDERED_STUCK: 
+            self._last_progresses.pop(0)
+        self._last_progresses.append(idx)
 
     def _get_progress(self):
         idx = self._last_progress_point
@@ -205,7 +233,7 @@ class MarioKartEnv(Mupen64PlusEnv):
                 if idx == self._last_progress_point:
                     print("went one time around!", self._last_progress_point, self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[self._last_progress_point]]), self.lap)
                     self._last_progress_point = 0
-                    return -1.0
+                    return - 1.0
                 if self._evaluate_checkpoint([self.CHECKPOINT_LOCATIONS[idx]]) != self.lap:
                     break
         idx = ((idx - 1) + len(self.CHECKPOINT_LOCATIONS)) % len(self.CHECKPOINT_LOCATIONS)
@@ -213,7 +241,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         # if we got into a new lap, we have to get the real progress
         if abs(dist) > (len(self.CHECKPOINT_LOCATIONS) // 2):
             dist = len(self.CHECKPOINT_LOCATIONS) - abs(dist)
+            self._last_progresses = []
         self._last_progress_point = idx
+        self._save_last_progress_point(idx)
         return dist * self.PROGRESS_SCALE
 
     def _get_reward(self):
@@ -223,8 +253,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         cur_lap = self._get_lap()
 
         if self.episode_completed:
+            cprint("yayy, race completed!!")
             # Scale out the end reward based on the total steps to get here; the fewer steps, the higher the reward
-            reward_to_return = 5 * (1250 - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
+            reward_to_return = (self.APPROX_MAX_STEP_COUNT - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
         else:
             if cur_lap > self.lap:
                 self.lap = cur_lap
@@ -233,12 +264,13 @@ class MarioKartEnv(Mupen64PlusEnv):
                 # Scale out the lap reward based on the steps to get here; the fewer steps, the higher the reward
                 reward_to_return = self.LAP_REWARD # TODO: Figure out a good scale here... number of steps required per lap will vary depending on the course; don't want negative reward for completing a lap
             progress = self._get_progress()
+            self.total_progress += progress
             reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
             reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
         self.last_known_lap = cur_lap
         # print("reward:", reward_to_return)
-        if reward_to_return > 1000:
-            print("whaaa?")
+        # if reward_to_return > 1000:
+        #     print("whaaa?")
         return reward_to_return
 
     def _get_lap(self):
@@ -308,17 +340,48 @@ class MarioKartEnv(Mupen64PlusEnv):
         # If the first pixel is not a valid color, no need to check the other three
         if not checkpoint_pixels[0] in self.HUD_PROGRESS_COLOR_VALUES:
             return -1
-        # print("first is in")
         # If the first pixel is good, make sure the other three match
         if not self.all_equal(checkpoint_pixels):
             return -1
-        # print("all equal")
         # If all are good, return the corresponding value
         return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
+    def _is_stuck(self):
+        '''If progress of last x steps is smaller than treshhold, we are stuck'''
+        if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
+            return False
+        if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
+            cprint("aborting because stuck!", "cyan")
+            if wandb.run is not None:
+                wandb.log({"env/episode-stop-reason": 0})
+            return True
+        return False
+
+
+    def _went_backwards(self):
+        if not all(self._last_progresses[i] <= self._last_progresses[i+5] for i in range(len(self._last_progresses) - 5)):
+            cprint("aborting because went backwards!", "cyan")
+            if wandb.run is not None:
+                wandb.log({"env/episode-stop-reason": 1})
+            return True
+        return False
+
+    def _not_started_driving(self):
+        if self.step_count > 300 and self.step_count < 500 and sum(self._last_progresses) < self.MIN_PROGRESS:
+            cprint("aborting because not started driving", "cyan")
+            if wandb.run is not None:
+                wandb.log({"env/episode-stop-reason": 2})
+            return True
+        return False
+
     def _evaluate_end_state(self):
+        # print(self._is_stuck())
+        # print(self._last_progresses)
+        abort_episode = self._is_stuck() or self._went_backwards() or self._not_started_driving()
         end_pixel = self.END_PIXELS[self.res_w]
-        return self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
+        completed_episode = self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(self.pixel_array, *end_pixel) #TODO: adjust for smaller resolutions
+        # completed_episode = self.lap == 2 and self._last_progress_point >= (len(self.CHECKPOINT_LOCATIONS) - 20)
+        return completed_episode, abort_episode
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')
