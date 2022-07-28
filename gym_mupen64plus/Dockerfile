@@ -17,17 +17,17 @@ FROM base AS buildstuff
 RUN apt-get update && \
     apt-get install -y \
     build-essential dpkg-dev \
-        git \
-        python3 python3-pip python3-setuptools python3-dev \
-        wget \
-        xvfb libxv1 x11vnc \
-        imagemagick \
-        mupen64plus-data mupen64plus-ui-console \
-        nano \
-        ffmpeg \
-        libjpeg-dev libtiff-dev libgtk2.0-dev \
-        libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
-        libjson-c-dev
+    git \
+    python3 python3-pip python3-setuptools python3-dev \
+    wget \
+    xvfb libxv1 x11vnc \
+    imagemagick \
+    mupen64plus-data mupen64plus-ui-console \
+    nano \
+    ffmpeg \
+    libjpeg-dev libtiff-dev libgtk2.0-dev \
+    libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
+    libjson-c-dev
 
 # clone, build, and install the input bot
 # (explicitly specifying commit hash to attempt to guarantee behavior within this container)
@@ -94,4 +94,4 @@ EXPOSE 5900
 # ToDo: This is hard-coded, however this might change?
 EXPOSE 8082
 
-RUN python envs/container_init.py
+CMD ["python", "envs/container_init.py"]
