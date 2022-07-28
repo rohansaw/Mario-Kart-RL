@@ -12,9 +12,9 @@ metric:
   name: rollout/ep_rew_mean
   goal: maximize
 parameters:
-  n_steps:
+  n-steps:
     values: [256, 512, 1024, 2048, 4096]
-  n_epochs:
+  n-epochs:
     values: [5, 10, 15, 20]
   batch-size:
     values: [64, 128, 256, 512]

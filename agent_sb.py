@@ -61,12 +61,12 @@ def main(args):
     else:
         model = PPO.load(args.from_pretrained, env=env)
 
-    model_store_path = Path(args.model_path) / run_id
+    model_store_path = Path(args.model_store_path) / run_id
     model_store_path.mkdir(parents=True, exist_ok=True)
     
     model.learn(total_timesteps=args.steps, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
     model.save(model_store_path / "best_model")
-    wandb.save(model_store_path / "best_model_wandb")
+    wandb.save(str(model_store_path / "best_model_wandb"))
     if args.evaluate_after_training:
         obs = env.reset()
         while True:
