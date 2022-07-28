@@ -1,5 +1,3 @@
-from enum import auto
-from PIL import Image
 from pathlib import Path
 import sys
 import socket
@@ -8,12 +6,7 @@ PY3_OR_LATER = sys.version_info[0] >= 3
 
 
 import abc
-import wandb
-import array
-from contextlib import contextmanager
 import inspect
-import itertools
-import json
 import os
 import subprocess
 import threading
@@ -21,11 +14,6 @@ import time
 from termcolor import cprint
 import yaml
 
-import gym
-from gym import error, spaces, utils
-from gym.utils import seeding
-
-import numpy as np
 
 import mss
 
@@ -67,7 +55,6 @@ class EnvController():
             self.res_h = res_h
         else:
             self.res_w, self.res_h = self.resolutions[resolution]
-        cprint(f"using resolution {self.res_w}x{self.res_h}")
         SCR_W, SCR_H = self.res_w, self.res_h
         
         self.benchmark = benchmark
@@ -80,7 +67,6 @@ class EnvController():
         
         
         self.config["PORT_NUMBER"] = self._next_free_port(self.config["PORT_NUMBER"])
-        self.controller_server = self._start_controller_server()
 
 
         initial_disp = os.environ["DISPLAY"]
@@ -104,10 +90,6 @@ class EnvController():
         # Restore the DISPLAY env var
         os.environ["DISPLAY"] = initial_disp
         cprint('Changed back to DISPLAY %s' % os.environ["DISPLAY"], 'red')
-        
-
-        with self.controller_server.frame_skip_disabled():
-            self._navigate_menu()
 
     def _base_load_config(self):
         self.config = yaml.safe_load(open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "config.yml")))
@@ -131,14 +113,16 @@ class EnvController():
     def _next_free_port(self, port):
         max_ports_to_test = 30
         for i in range(port, port + max_ports_to_test):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                try:
-                    print("trying out port", i, "...")
-                    s.bind(('localhost', i))
-                    return i
-                except:
-                    pass
-        raise Exception(f"cannot find any available port in range {port} - {port + max_ports_to_test}")
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                print("trying out port", i, "...")
+                s.bind(('localhost', i))
+                return i
+            except:
+                pass
+            finally:
+                s.close()
+        raise Exception("cannot find any available port in range" +  port + "port + max_ports_to_test")
 
     def _start_emulator(self,
                         rom_name,
@@ -157,15 +141,15 @@ class EnvController():
             msg = "ROM not found: " + rom_path
             cprint(msg, 'red')
             rom_dir = Path(rom_path).parent
-            download = input("Do you want to download and extract the file? Y/N ")
+            '''download = input("Do you want to download and extract the file? Y/N ")
             if download == "Y":
                 download_url = "https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip"
-                os.system(f"wget {download_url} -O /tmp/marioKart.zip")
+                os.system("wget " + {download_url} -O /tmp/marioKart.zip")
                 os.system(f"unzip /tmp/marioKart.zip -d {str(rom_dir.resolve())}")
                 os.system(f"mv '{str(rom_dir.resolve() / 'Mario Kart 64 (USA).n64')}' {rom_path}")
                 cprint("Rom file downloaded!")
-            else:
-                raise Exception(msg)
+            else: '''
+            raise Exception(msg)
                 
 
         input_driver_path = os.path.abspath(os.path.expanduser(input_driver_path))
@@ -176,7 +160,7 @@ class EnvController():
         
         benchmark_options = [
                 "--nospeedlimit",
-                "--set", f"Core[CountPerOp]={COUNTPEROP}",
+                "--set", "Core[CountPerOp]="+str(COUNTPEROP),
                 # "--set", f"Core[DelaySI]=False",
                 # "--set", f"Video-Glide64[filtering]=0",
                 # "--set", f"Video-Glide64[fast_crc]=True",
@@ -195,7 +179,7 @@ class EnvController():
                "%ix%i" % (res_w, res_h),
                "--gfx", gfx_plugin,
                "--audio", "dummy",
-                "--set", f"Input-Bot-Control0[port]={self.config['PORT_NUMBER']}",
+                "--set", "Input-Bot-Control0[port]="+str(self.config['PORT_NUMBER']),
                "--input", input_driver_path,
                rom_path]
         

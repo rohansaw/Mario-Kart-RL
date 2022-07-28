@@ -50,7 +50,7 @@ FROM base
 # Update package cache and install dependencies
 RUN apt-get update && \
     apt-get install -y \
-    python python-pip python-setuptools python-dev \
+    python python-pip python-setuptools python-dev python3\
     wget \
     xvfb libxv1 x11vnc \
     imagemagick \
@@ -72,29 +72,26 @@ RUN wget "https://sourceforge.net/projects/virtualgl/files/${VIRTUALGL_VERSION}/
 
 # Install dependencies (here for caching)
 RUN pip install \
-    gym==0.7.4 \
-    numpy==1.16.2 \
     PyYAML==5.1 \
     termcolor==1.1.0 \
     mss==4.0.2 \
-    opencv-python==4.1.0.25 \
-    pyglet==1.2.0
+    pathlib
 
 # Copy compiled input plugin from buildstuff layer
 COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/local/lib/mupen64plus/
 
 # Copy the gym environment (current directory)
-COPY . /src/gym-mupen64plus
-
-# Install requirements & this package
-WORKDIR /src/gym-mupen64plus
-RUN pip install -e .
-RUN pip install torch==1.10.0+cu113 torchvision==0.11.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+COPY . /src/
 
 # Declare ROMs as a volume for mounting a host path outside the container
-VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
+VOLUME /src/envs/ROMs/
 
 WORKDIR /src
 
 # Expose the default VNC port for connecting with a client/viewer outside the container
 EXPOSE 5900
+# Expose port of input-bot
+# ToDo: This is hard-coded, however this might change?
+EXPOSE 8082
+
+RUN python envs/container_init.py

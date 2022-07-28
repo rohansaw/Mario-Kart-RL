@@ -28,3 +28,6 @@ GFX_PLUGIN: mupen64plus-video-rice.so
 
 # The path to the mupen64plus input driver:
 INPUT_DRIVER_PATH: /usr/local/lib/mupen64plus/mupen64plus-input-bot.so
+
+# The name of the ROM that should be opened
+ROM_NAME: marioKart.n64
