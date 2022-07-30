@@ -39,7 +39,7 @@ services:
       'mupen64plus',
       '--nospeedlimit',
       '--nosaveoptions',
-      '--resolution', '640x480',
+      '--resolution', '${RESOLUTION}',
       '--gfx', 'mupen64plus-video-glide64.so',
       '--audio', 'dummy',
       '--input', '/usr/local/lib/mupen64plus/mupen64plus-input-bot.so',
