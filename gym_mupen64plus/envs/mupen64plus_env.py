@@ -1,3 +1,21 @@
+import mss
+import numpy as np
+from gym.utils import seeding
+from gym import error, spaces, utils
+import gym
+import yaml
+from termcolor import cprint
+import time
+import threading
+import subprocess
+import os
+import json
+import itertools
+import inspect
+from contextlib import contextmanager
+import array
+import wandb
+import abc
 from enum import auto
 from PIL import Image
 from pathlib import Path
@@ -7,29 +25,8 @@ import socket
 PY3_OR_LATER = sys.version_info[0] >= 3
 
 
-import abc
-import wandb
-import array
-from contextlib import contextmanager
-import inspect
-import itertools
-import json
-import os
-import subprocess
-import threading
-import time
-from termcolor import cprint
-import yaml
-
-import gym
-from gym import error, spaces, utils
-from gym.utils import seeding
-
-import numpy as np
-
-import mss
-
 ###############################################
+
 class ImageHelper:
 
     def GetPixelColor(self, image_array, x, y):
@@ -65,7 +62,7 @@ BENCHMARK = False
 class Mupen64PlusEnv(gym.Env):
     __metaclass__ = abc.ABCMeta
     metadata = {'render.modes': ['human', 'rgb_array']}
-    
+
     resolutions = {
         "normal": (640, 480),
         "small": (320, 240),
@@ -73,8 +70,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, benchmark=True, resolution="supersmall", res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
-        
+    def __init__(self, input_port="8082", vnc_port="5009", benchmark=True, resolution="supersmall", res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
             self.res_w = res_w
@@ -86,7 +82,9 @@ class Mupen64PlusEnv(gym.Env):
         self.variable_episode_length = variable_episode_length
         self.episode_length = base_episode_length
         self.episode_length_increase = episode_length_increase
-        
+
+        self.input_port = input_port
+        self.vnc_port = vnc_port
         self.viewer = None
         self.benchmark = benchmark
         self.reset_count = 0
@@ -107,11 +105,10 @@ class Mupen64PlusEnv(gym.Env):
         self.frame_skip = self.config['FRAME_SKIP']
         if self.frame_skip < 1:
             self.frame_skip = 1
-        
-        
-        self.config["PORT_NUMBER"] = self._next_free_port(self.config["PORT_NUMBER"])
-        self.controller_server = self._start_controller_server()
 
+        self.config["PORT_NUMBER"] = self._next_free_port(
+            self.config["PORT_NUMBER"])
+        self.controller_server = self._start_controller_server()
 
         initial_disp = os.environ["DISPLAY"]
         cprint('Initially on DISPLAY %s' % initial_disp, 'red')
@@ -119,7 +116,8 @@ class Mupen64PlusEnv(gym.Env):
         # If the EXTERNAL_EMULATOR environment variable is True, we are running the
         # emulator out-of-process (likely via docker/docker-compose). If not, we need
         # to start the emulator in-process here
-        external_emulator = "EXTERNAL_EMULATOR" in os.environ and os.environ["EXTERNAL_EMULATOR"] == 'True'
+        external_emulator = "EXTERNAL_EMULATOR" in os.environ and os.environ[
+            "EXTERNAL_EMULATOR"] == 'True'
         if not external_emulator:
             self.xvfb_process, self.emulator_process = \
                 self._start_emulator(rom_name=self.config['ROM_NAME'],
@@ -132,43 +130,47 @@ class Mupen64PlusEnv(gym.Env):
         # so it attaches to the correct X display; otherwise screenshots may
         # come from the wrong place. This used to be true when we were using
         # wxPython for screenshots. Untested after switching to mss.
-        cprint('Calling mss.mss() with DISPLAY %s' % os.environ["DISPLAY"], 'red')
+        cprint('Calling mss.mss() with DISPLAY %s' %
+               os.environ["DISPLAY"], 'red')
         self.mss_grabber = mss.mss()
-        time.sleep(2) # Give mss a couple seconds to initialize; also may not be necessary
+        # Give mss a couple seconds to initialize; also may not be necessary
+        time.sleep(2)
 
         # Restore the DISPLAY env var
         os.environ["DISPLAY"] = initial_disp
         cprint('Changed back to DISPLAY %s' % os.environ["DISPLAY"], 'red')
-        
 
         with self.controller_server.frame_skip_disabled():
             self._navigate_menu()
 
         self.observation_space = \
-            spaces.Box(low=0, high=255, shape=(SCR_H, SCR_W, 1), dtype=np.uint8)
+            spaces.Box(low=0, high=255, shape=(
+                SCR_H, SCR_W, 1), dtype=np.uint8)
 
-        actions = [[-80, 80], # Joystick X-axis
-                                                  [-80, 80], # Joystick Y-axis
-                                                  [  0,  1], # A Button
-                                                  [  0,  1], # B Button
-                                                  [  0,  1], # RB Button
-                                                  [  0,  1], # LB Button
-                                                  [  0,  1], # Z Button
-                                                  [  0,  1], # C Right Button
-                                                  [  0,  1], # C Left Button
-                                                  [  0,  1], # C Down Button
-                                                  [  0,  1], # C Up Button
-                                                  [  0,  1], # D-Pad Right Button
-                                                  [  0,  1], # D-Pad Left Button
-                                                  [  0,  1], # D-Pad Down Button
-                                                  [  0,  1], # D-Pad Up Button
-                                                  [  0,  1], # Start Button
-                                                 ]
+        actions = [[-80, 80],  # Joystick X-axis
+                   [-80, 80],  # Joystick Y-axis
+                   [0,  1],  # A Button
+                   [0,  1],  # B Button
+                   [0,  1],  # RB Button
+                   [0,  1],  # LB Button
+                   [0,  1],  # Z Button
+                   [0,  1],  # C Right Button
+                   [0,  1],  # C Left Button
+                   [0,  1],  # C Down Button
+                   [0,  1],  # C Up Button
+                   [0,  1],  # D-Pad Right Button
+                   [0,  1],  # D-Pad Left Button
+                   [0,  1],  # D-Pad Down Button
+                   [0,  1],  # D-Pad Up Button
+                   [0,  1],  # Start Button
+                   ]
 
-        self.action_space = spaces.MultiDiscrete([len(action) for action in actions])
+        self.action_space = spaces.MultiDiscrete(
+            [len(action) for action in actions])
 
     def _base_load_config(self):
-        self.config = yaml.safe_load(open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "config.yml")))
+        self.config = yaml.safe_load(
+            open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "config.yml")))
         self._load_config()
 
     @abc.abstractmethod
@@ -187,7 +189,7 @@ class Mupen64PlusEnv(gym.Env):
         return
 
     def _step(self, action):
-        #cprint('Step %i: %s' % (self.step_count, action), 'green')
+        # cprint('Step %i: %s' % (self.step_count, action), 'green')
         # start = time.time()
         self._act(action)
         # # end = time.time()
@@ -203,7 +205,7 @@ class Mupen64PlusEnv(gym.Env):
             self.episode_completed = False
         else:
             self.episode_completed, self.episode_aborted = self._evaluate_end_state()
-        
+
         if not self.auto_abort:
             self.episode_aborted = False
         # # end = time.time()
@@ -216,9 +218,10 @@ class Mupen64PlusEnv(gym.Env):
         self.step_count += 1
         # if self.episode_over:
         self.episode_reward += reward
-        
+
         if self.gray_scale:
-            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
+            obs = np.average(obs, axis=2, weights=[
+                             0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
             # self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
         if self.episode_aborted:
             cprint("Episode aborted!", "cyan")
@@ -236,7 +239,8 @@ class Mupen64PlusEnv(gym.Env):
                 self.controller_server.send_controls(ControllerState(action))
             # print("sending...")
         else:
-            self.controller_server.send_controls(ControllerState(action), count=count, force_count=force_count)
+            self.controller_server.send_controls(ControllerState(
+                action), count=count, force_count=force_count)
         # self.render(mode="human")
         # time.sleep(0.2)
         # print("done.")
@@ -246,11 +250,11 @@ class Mupen64PlusEnv(gym.Env):
 
     def _press_button(self, button, times=1):
         for _ in itertools.repeat(None, times):
-            self._act(button) # Press
-            self._act(ControllerState.NO_OP) # and release
-    
+            self._act(button)  # Press
+            self._act(ControllerState.NO_OP)  # and release
+
     def _observe(self):
-        #cprint('Observe called!', 'yellow')
+        # cprint('Observe called!', 'yellow')
 
         if self.config['USE_XVFB']:
             offset_x = 0
@@ -258,13 +262,17 @@ class Mupen64PlusEnv(gym.Env):
         else:
             offset_x = self.config['OFFSET_X']
             offset_y = self.config['OFFSET_Y']
+
+
+#        print(image_array)
+
         image_array = \
             np.array(self.mss_grabber.grab({"top": offset_y,
                                             "left": offset_x,
                                             "width": SCR_W,
                                             "height": SCR_H}),
-                    dtype=np.uint8)
-    
+                     dtype=np.uint8)
+
         # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
         self.pixel_array = np.flip(image_array[:, :, :3], 2)
         return self.pixel_array
@@ -275,12 +283,12 @@ class Mupen64PlusEnv(gym.Env):
 
     @abc.abstractmethod
     def _get_reward(self):
-        #cprint('Get Reward called!', 'yellow')
+        # cprint('Get Reward called!', 'yellow')
         return 0
 
     @abc.abstractmethod
     def _evaluate_end_state(self):
-        #cprint('Evaluate End State called!', 'yellow')
+        # cprint('Evaluate End State called!', 'yellow')
         return False, False
 
     @abc.abstractmethod
@@ -288,11 +296,12 @@ class Mupen64PlusEnv(gym.Env):
         cprint('Reset called!', 'yellow')
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
-        
+
         self.max_reward = max(self.max_reward, self.episode_reward)
         self.max_duration = max(self.max_duration, self.step_count)
-        cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
-        
+        cprint(
+            f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
+
         if wandb.run is not None:
             wandb.log({
                 "env/rewards": self.episode_reward,
@@ -304,12 +313,12 @@ class Mupen64PlusEnv(gym.Env):
         if self.reset_count > 1 and self.variable_episode_length:
             self.episode_length += self.episode_length_increase
             cprint(f"next episode length: {self.episode_length}", "yellow")
-        
 
         self.step_count = 0
         obs = self._observe()
         if self.gray_scale:
-            obs = np.average(obs, axis=2, weights=[0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
+            obs = np.average(obs, axis=2, weights=[
+                             0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
         return obs
 
     def _render(self, mode='human', close=False):
@@ -335,15 +344,15 @@ class Mupen64PlusEnv(gym.Env):
 
     def _start_controller_server(self):
         server = ControllerUpdater(
-            input_host  = '',
-            input_port= self.config['PORT_NUMBER'],
-            control_timeout = self.config['ACTION_TIMEOUT'],
-            frame_skip = self.frame_skip) # TODO: Environment argument (with issue #26)
-        print('ControllerUpdater started on port ', self.config['PORT_NUMBER'])
+            input_host='',
+            input_port=self.input_port,  # gets port for external
+            control_timeout=self.config['ACTION_TIMEOUT'],
+            frame_skip=self.frame_skip)  # TODO: Environment argument (with issue #26)
+        print('ControllerUpdater started on port ', self.input_port)
         return server
 
     def _stop_controller_server(self):
-        #cprint('Stop Controller Server called!', 'yellow')
+        # cprint('Stop Controller Server called!', 'yellow')
         if hasattr(self, 'controller_server'):
             self.controller_server.shutdown()
 
@@ -357,7 +366,8 @@ class Mupen64PlusEnv(gym.Env):
                     return i
                 except:
                     pass
-        raise Exception(f"cannot find any available port in range {port} - {port + max_ports_to_test}")
+        raise Exception(
+            f"cannot find any available port in range {port} - {port + max_ports_to_test}")
 
     def _start_emulator(self,
                         rom_name,
@@ -376,48 +386,50 @@ class Mupen64PlusEnv(gym.Env):
             msg = "ROM not found: " + rom_path
             cprint(msg, 'red')
             rom_dir = Path(rom_path).parent
-            download = input("Do you want to download and extract the file? Y/N ")
+            download = input(
+                "Do you want to download and extract the file? Y/N ")
             if download == "Y":
                 download_url = "https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip"
                 os.system(f"wget {download_url} -O /tmp/marioKart.zip")
-                os.system(f"unzip /tmp/marioKart.zip -d {str(rom_dir.resolve())}")
-                os.system(f"mv '{str(rom_dir.resolve() / 'Mario Kart 64 (USA).n64')}' {rom_path}")
+                os.system(
+                    f"unzip /tmp/marioKart.zip -d {str(rom_dir.resolve())}")
+                os.system(
+                    f"mv '{str(rom_dir.resolve() / 'Mario Kart 64 (USA).n64')}' {rom_path}")
                 cprint("Rom file downloaded!")
             else:
                 raise Exception(msg)
-                
 
-        input_driver_path = os.path.abspath(os.path.expanduser(input_driver_path))
+        input_driver_path = os.path.abspath(
+            os.path.expanduser(input_driver_path))
         if not os.path.isfile(input_driver_path):
             msg = "Input driver not found: " + input_driver_path
             cprint(msg, 'red')
             raise Exception(msg)
-        
+
         benchmark_options = [
-                "--nospeedlimit",
-                "--set", f"Core[CountPerOp]={COUNTPEROP}",
-                # "--set", f"Core[DelaySI]=False",
-                # "--set", f"Video-Glide64[filtering]=0",
-                # "--set", f"Video-Glide64[fast_crc]=True",
-                # "--set", f"Video-Glide64[fb_hires]=False",
-                # "--set", "Video-Rice[ScreenUpdateSetting]=3",
-                # "--set", "Video-Rice[FastTextureLoading]=1",
-                # "--set", "Video-Rice[TextureQuality]=2",
-                # "--set", "Video-Rice[ColorQuality]=1",
+            "--nospeedlimit",
+            "--set", f"Core[CountPerOp]={COUNTPEROP}",
+            # "--set", f"Core[DelaySI]=False",
+            # "--set", f"Video-Glide64[filtering]=0",
+            # "--set", f"Video-Glide64[fast_crc]=True",
+            # "--set", f"Video-Glide64[fb_hires]=False",
+            # "--set", "Video-Rice[ScreenUpdateSetting]=3",
+            # "--set", "Video-Rice[FastTextureLoading]=1",
+            # "--set", "Video-Rice[TextureQuality]=2",
+            # "--set", "Video-Rice[ColorQuality]=1",
         ]
 
-        
         cmd = [self.config['MUPEN_CMD'],
-                # "--nospeedlimit",
+               # "--nospeedlimit",
                "--nosaveoptions",
                "--resolution",
                "%ix%i" % (res_w, res_h),
                "--gfx", gfx_plugin,
                "--audio", "dummy",
-                "--set", f"Input-Bot-Control0[port]={self.config['PORT_NUMBER']}",
+               "--set", f"Input-Bot-Control0[port]={self.input_port}",
                "--input", input_driver_path,
                rom_path]
-        
+
         if self.benchmark:
             cmd = [cmd[0]] + benchmark_options + cmd[1:]
 
@@ -439,16 +451,17 @@ class Mupen64PlusEnv(gym.Env):
 
                 cprint('Starting xvfb with command: %s' % xvfb_cmd, 'yellow')
 
-                xvfb_proc = subprocess.Popen(xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
+                xvfb_proc = subprocess.Popen(
+                    xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
 
-                time.sleep(2) # Give xvfb a couple seconds to start up
+                time.sleep(2)  # Give xvfb a couple seconds to start up
 
                 # Poll the process to see if it exited early
                 # (most likely due to a server already active on the display_num)
                 if xvfb_proc.poll() is None:
                     success = True
 
-                print('') # new line
+                print('')  # new line
 
             if not success:
                 msg = "Failed to initialize Xvfb!"
@@ -459,12 +472,13 @@ class Mupen64PlusEnv(gym.Env):
             cprint('Using DISPLAY %s' % os.environ["DISPLAY"], 'blue')
             cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
 
-            cmd = [self.config['VGLRUN_CMD'], "-d", ":" + str(display_num)] + cmd
+            cmd = [self.config['VGLRUN_CMD'],
+                   "-d", ":" + str(display_num)] + cmd
         # else:
         #     cmd.append("--noosd")
 
         cprint('Starting emulator with comand: %s' % cmd, 'yellow')
-        
+
         print("COMMAND: ", " ".join(cmd))
 
         emulator_process = subprocess.Popen(cmd,
@@ -481,7 +495,7 @@ class Mupen64PlusEnv(gym.Env):
         return xvfb_proc, emulator_process
 
     def _kill_emulator(self):
-        #cprint('Kill Emulator called!', 'yellow')
+        # cprint('Kill Emulator called!', 'yellow')
         try:
             self._act(ControllerState.NO_OP)
             if self.emulator_process is not None:
@@ -489,7 +503,7 @@ class Mupen64PlusEnv(gym.Env):
             if self.xvfb_process is not None:
                 self.xvfb_process.terminate()
         except AttributeError:
-            pass # We may be shut down during intialization before these attributes have been set
+            pass  # We may be shut down during intialization before these attributes have been set
 
     def reset(self):
         return self._reset()
@@ -521,19 +535,29 @@ class EmulatorMonitor:
 class ControllerState(object):
 
     # Controls           [ JX,  JY,  A,  B, RB, LB,  Z, CR, CL, CD, CU, DR, DL, DD, DU,  S]
-    NO_OP              = [  0,   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    START_BUTTON       = [  0,   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1]
-    A_BUTTON           = [  0,   0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    B_BUTTON           = [  0,   0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    RB_BUTTON          = [  0,   0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    CR_BUTTON          = [  0,   0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0]
-    CL_BUTTON          = [  0,   0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0]
-    CD_BUTTON          = [  0,   0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0]
-    CU_BUTTON          = [  0,   0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0]
-    JOYSTICK_UP        = [  0,  127, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    JOYSTICK_DOWN      = [  0, -128, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    JOYSTICK_LEFT      = [-128,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
-    JOYSTICK_RIGHT     = [ 127,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    NO_OP = [0,   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    START_BUTTON = [0,   0,  0,  0,  0,  0,
+                    0,  0,  0,  0,  0,  0,  0,  0,  0,  1]
+    A_BUTTON = [0,   0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    B_BUTTON = [0,   0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    RB_BUTTON = [0,   0,  0,  0,  1,  0,  0,
+                 0,  0,  0,  0,  0,  0,  0,  0,  0]
+    CR_BUTTON = [0,   0,  0,  0,  0,  0,  0,
+                 1,  0,  0,  0,  0,  0,  0,  0,  0]
+    CL_BUTTON = [0,   0,  0,  0,  0,  0,  0,
+                 0,  1,  0,  0,  0,  0,  0,  0,  0]
+    CD_BUTTON = [0,   0,  0,  0,  0,  0,  0,
+                 0,  0,  1,  0,  0,  0,  0,  0,  0]
+    CU_BUTTON = [0,   0,  0,  0,  0,  0,  0,
+                 0,  0,  0,  1,  0,  0,  0,  0,  0]
+    JOYSTICK_UP = [0,  127, 0,  0,  0,  0,
+                   0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    JOYSTICK_DOWN = [0, -128, 0,  0,  0,  0,
+                     0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    JOYSTICK_LEFT = [-128,  0,  0,  0,  0,  0,
+                     0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    JOYSTICK_RIGHT = [127,  0,  0,  0,  0,  0,
+                      0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
 
     def __init__(self, controls=NO_OP):
         # print("doing controls:", controls)
@@ -559,6 +583,8 @@ class ControllerState(object):
         return "|".join([str(i) for i in self.controls])
 
 ###############################################
+
+
 class ControllerUpdater(object):
 
     def __init__(self, input_host, input_port, control_timeout, frame_skip):
@@ -577,7 +603,7 @@ class ControllerUpdater(object):
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
         msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-        
+
         try:
             self.socket.sendall(msg.encode())
             self.socket.recv(1)
@@ -587,6 +613,7 @@ class ControllerUpdater(object):
             self.socket.connect((self.input_host, self.input_port))
             self.socket.sendall(msg.encode())
             self.socket.recv(1)
+
     def shutdown(self):
         self.running = False
         self.socket.close()
