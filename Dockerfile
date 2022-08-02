@@ -43,7 +43,9 @@ FROM base
 # Update package cache and install dependencies
 RUN apt-get update && \
 	apt-get install -y \
-	python python-pip python-setuptools python-dev \
+	python3 \
+	python3-pip \
+	python-dev \
 	wget \
 	xvfb libxv1 x11vnc \
 	imagemagick \
@@ -51,10 +53,10 @@ RUN apt-get update && \
 	nano \
 	ffmpeg \
 	libjson-c2
-
+#RUN pip3 install -U  --upgrade pip
 # Upgrade pip (pip 21.0 dropped support for Python 2.7 in January 2021 - https://stackoverflow.com/a/65896996/9526448)
 # TODO: Python3 upgrade - https://github.com/bzier/gym-mupen64plus/issues/81
-RUN pip install --upgrade "pip < 21.0"
+#RUN pip install --upgrade "pip < 21.0"
 
 # Install VirtualGL (provides vglrun to allow us to run the emulator in XVFB)
 # (Check for new releases here: https://github.com/VirtualGL/virtualgl/releases)
@@ -64,20 +66,26 @@ RUN wget "https://sourceforge.net/projects/virtualgl/files/${VIRTUALGL_VERSION}/
 	rm virtualgl_${VIRTUALGL_VERSION}_amd64.deb
 
 # Install dependencies (here for caching)
-RUN pip install \
-	gym==0.7.4 \
-	numpy==1.16.2 \
-	PyYAML==5.1 \
-	termcolor==1.1.0 \
-	mss==4.0.2 \
-	opencv-python==4.1.0.25 \
-	pyglet==1.2.0
+
+#RUN pip install \
+#	gym==0.7.4 \
+#	numpy==1.16.2 \
+#	PyYAML==5.1 \
+#	termcolor==1.1.0 \
+#	mss==4.0.2 \
+#	opencv-python==4.1.0.25 \
+#	pyglet==1.2.0
+
+RUN pip3 install mss 
+#numpy
 
 # Copy compiled input plugin from buildstuff layer
 COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/local/lib/mupen64plus/
 
 # Copy the gym environment (current directory)
 COPY . /src/gym-mupen64plus
+COPY ./src/server.py ./src/server.py
+COPY ./src/pythonServer.py ./src/pythonServer.py
 
 # Install requirements & this package
 #WORKDIR /src/gym-mupen64plus
@@ -87,7 +95,7 @@ COPY . /src/gym-mupen64plus
 VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
 
 WORKDIR /src
-
 # Expose the default VNC port for connecting with a client/viewer outside the container
 EXPOSE 5900
 EXPOSE 8082
+EXPOSE 8070

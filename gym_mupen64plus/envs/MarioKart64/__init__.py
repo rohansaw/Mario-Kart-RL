@@ -24,8 +24,8 @@ courses = [
 ]
 
 
-configs = [{'input_port': '8082', 'vnc_port': '8083', 'xvfb_port': '6000', 'name': '1'},
-           {'input_port': '8084', 'vnc_port': '8085', 'xvfb_port': '6001', 'name': '2'}]
+configs = [{'input_port': '8082', 'vnc_port': '8083', 'xvfb_port': '6000', 'screen_port': '9000', 'name': '1'},
+           {'input_port': '8084', 'vnc_port': '8085', 'xvfb_port': '6001', 'screen_port': '9001', 'name': '2'}]
 os.environ["EXTERNAL_EMULATOR"] = 'True'
 # here docker container starten und ports setzen und dann leggo
 for config in configs:
@@ -33,6 +33,7 @@ for config in configs:
         os.environ["INPUT_PORT"] = config['input_port']
         os.environ["VNC_PORT"] = config['vnc_port']
         os.environ["XVFB_PORT"] = config['xvfb_port']
+        os.environ["SCREEN_PORT"] = config['screen_port']
         subprocess.run(
             f"docker-compose --project-name {config['name']} up --build -d", shell=True)
         # Continuous Action Space:
