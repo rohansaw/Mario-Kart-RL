@@ -7,26 +7,20 @@ import sys
 from http.server import HTTPServer
 HOST_NAME = "0.0.0.0"
 PORT = 8070
-print(sys.version)
-print("HJDW SKJ ")
 
 
-print("HSHDKJSHSK")
 mss_grabber = mss.mss()
-print("SHDS")
 time.sleep(2)
-print("S .  ")
 
 
 class PythonServer(SimpleHTTPRequestHandler):
     def do_GET(self):
-        print("SS")
         top = None
         left = None
         width = None
         height = None
         if self.path == '/image':
-            print("S")
+
             if '?' in self.path:
                 path, tmp = self.path.split('?', 1)
                 qs = parse_qs(urlparse.parse_qs(tmp).query)
@@ -46,11 +40,10 @@ class PythonServer(SimpleHTTPRequestHandler):
             self.wfile.write(bytes(image_array, "utf-8"))
 
 
-print("HA")
 server = HTTPServer((HOST_NAME, PORT), PythonServer)
 #print(f"Server started http://{HOST_NAME}:{PORT}")
 try:
-    print("Sdaw")
+
     server.serve_forever()
 except KeyboardInterrupt:
     server.server_close()
