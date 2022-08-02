@@ -1,6 +1,5 @@
 from urllib.parse import urlparse, parse_qs
 import mss
-from pythonServer import PythonServer
 from http.server import SimpleHTTPRequestHandler
 import time
 import sys
