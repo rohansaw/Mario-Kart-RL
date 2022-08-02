@@ -1,5 +1,4 @@
 from urllib.parse import urlparse, parse_qs
-import numpy as np
 import mss
 from pythonServer import PythonServer
 from http.server import SimpleHTTPRequestHandler
@@ -35,7 +34,7 @@ class PythonServer(SimpleHTTPRequestHandler):
                 left = qs['left'][0]
                 width = qs['width'][0]
                 height = qs['height'][0]
-            image_array = np.array(mss_grabber.grab(), dtype=np.uint8)
+            image_array = mss_grabber.grab()
             # {"top": top,
             # "left": left,
             #                                "width": width,
