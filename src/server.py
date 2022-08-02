@@ -39,7 +39,7 @@ class PythonServer(SimpleHTTPRequestHandler):
             # print(image_array)
                 self.send_response(200, "OK")
                 self.end_headers()
-                self.wfile.write(bytes('image_array', "utf-8"))
+                self.wfile.write(bytes(image_array, "utf-8"))
 
 
 server = HTTPServer((HOST_NAME, PORT), PythonServer)
