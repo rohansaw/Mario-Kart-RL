@@ -80,8 +80,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS_CONSIDERED_STUCK = 40
-    MIN_PROGRESS = 1.5
+    AMOUNT_STEPS_CONSIDERED_STUCK = 5
+    MIN_PROGRESS = 1
     
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -353,8 +353,11 @@ class MarioKartEnv(Mupen64PlusEnv):
         if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
         print(self.total_progress)
-        if self.lap == 0 and self.total_progress:
-            pass
+        # let the agent speedup first
+        if self.lap == 0 and self.total_progress < 120:
+            return False
+        # driving to slow
+        print(self._last_progresses)
         if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
             cprint("aborting because stuck!", "cyan")
             if wandb.run is not None:
