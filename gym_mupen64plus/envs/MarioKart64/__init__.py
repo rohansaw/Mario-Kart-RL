@@ -28,41 +28,41 @@ configs = [{'input_port': '8082', 'vnc_port': '8083', 'xvfb_port': '6000', 'scre
            {'input_port': '8084', 'vnc_port': '8085', 'xvfb_port': '6001', 'screen_port': '9001', 'name': '2'}]
 os.environ["EXTERNAL_EMULATOR"] = 'True'
 # here docker container starten und ports setzen und dann leggo
-for config in configs:
-    for course in courses:
-        os.environ["INPUT_PORT"] = config['input_port']
-        os.environ["VNC_PORT"] = config['vnc_port']
-        os.environ["XVFB_PORT"] = config['xvfb_port']
-        os.environ["SCREEN_PORT"] = config['screen_port']
-        subprocess.run(
-            f"docker-compose --project-name {config['name']} up --build -d", shell=True)
-        # Continuous Action Space:
-        register(
-            id='Mario-Kart-%s-v0' % course['name'],
-            entry_point='gym_mupen64plus.envs.MarioKart64:MarioKartEnv',
-            kwargs={'course': course['name'].replace(
-                '-', ''), 'input_port': config['input_port'], 'vnc_port': config['vnc_port']},
-            # tags={
-            #    'mupen': True,
-            #    'cup': course['cup'],
-            # #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
+# for config in configs:
+for course in courses:
+    # os.environ["INPUT_PORT"] = config['input_port']
+    # os.environ["VNC_PORT"] = config['vnc_port']
+    # os.environ["XVFB_PORT"] = config['xvfb_port']
+    # os.environ["SCREEN_PORT"] = config['screen_port']
+    # subprocess.run(
+    #     f"docker-compose --project-name {config['name']} up --build -d", shell=True)
+    # Continuous Action Space:
+    register(
+        id='Mario-Kart-%s-v0' % course['name'],
+        entry_point='gym_mupen64plus.envs.MarioKart64:MarioKartEnv',
+        kwargs={'course': course['name'].replace(
+            '-', ''), 'input_port': config['input_port'], 'vnc_port': config['vnc_port']},
+        # tags={
+        #    'mupen': True,
+        #    'cup': course['cup'],
+        # #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
 
-            # },
-            # max_episode_steps=course["max_steps"],
-            nondeterministic=True,
-        )
+        # },
+        # max_episode_steps=course["max_steps"],
+        nondeterministic=True,
+    )
 
-        # Discrete Action Space:
-        register(
-            id='Mario-Kart-Discrete-%s-v0' % course['name'],
-            entry_point='gym_mupen64plus.envs.MarioKart64:MarioKartDiscreteEnv',
-            kwargs={'course': course['name'].replace(
-                '-', ''), 'input_port': config['input_port'], 'vnc_port': config['vnc_port']},
-            # tags={
-            #    'mupen': True,
-            #    'cup': course['cup'],
-            #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
-            # },
-            # max_episode_steps=course["max_steps"],
-            nondeterministic=True,
-        )
+    # Discrete Action Space:
+    register(
+        id='Mario-Kart-Discrete-%s-v0' % course['name'],
+        entry_point='gym_mupen64plus.envs.MarioKart64:MarioKartDiscreteEnv',
+        kwargs={'course': course['name'].replace(
+            '-', ''), 'input_port': config['input_port'], 'vnc_port': config['vnc_port']},
+        # tags={
+        #    'mupen': True,
+        #    'cup': course['cup'],
+        #    'wrapper_config.TimeLimit.max_episode_steps': course['max_steps'],
+        # },
+        # max_episode_steps=course["max_steps"],
+        nondeterministic=True,
+    )

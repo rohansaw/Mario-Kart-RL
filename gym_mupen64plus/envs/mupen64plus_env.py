@@ -124,6 +124,7 @@ class Mupen64PlusEnv(gym.Env):
                                      gfx_plugin=self.config['GFX_PLUGIN'],
                                      input_driver_path=self.config['INPUT_DRIVER_PATH'],
                                      res_w=SCR_W, res_h=SCR_H, res_d=SCR_D)
+        self.start_emulator_container()
 
         # TODO: Test and cleanup:
         # May need to initialize this after the DISPLAY env var has been set
@@ -191,11 +192,11 @@ class Mupen64PlusEnv(gym.Env):
     def _step(self, action):
         # cprint('Step %i: %s' % (self.step_count, action), 'green')
         # start = time.time()
-        self._act(action)
+        image = self._act(action)
         # # end = time.time()
         # print("step time:", end - start)
         # # start = time.time()
-        obs = self._observe()
+        obs = self._observe(image)
         # # end = time.time()
         # print("observe time:", end - start)
         # # start = time.time()
@@ -236,11 +237,12 @@ class Mupen64PlusEnv(gym.Env):
         if not self.controller_server.frame_skip_enabled and not force_count:
             # print("sending single passes")
             for _ in itertools.repeat(None, count):
-                self.controller_server.send_controls(ControllerState(action))
+                image = self.controller_server.send_controls(ControllerState(action))
             # print("sending...")
         else:
-            self.controller_server.send_controls(ControllerState(
+            image = self.controller_server.send_controls(ControllerState(
                 action), count=count, force_count=force_count)
+        return image
         # self.render(mode="human")
         # time.sleep(0.2)
         # print("done.")
@@ -253,28 +255,31 @@ class Mupen64PlusEnv(gym.Env):
             self._act(button)  # Press
             self._act(ControllerState.NO_OP)  # and release
 
-    def _observe(self):
+    def _observe(self, image):
         # cprint('Observe called!', 'yellow')
 
-        if self.config['USE_XVFB']:
-            offset_x = 0
-            offset_y = 0
-        else:
-            offset_x = self.config['OFFSET_X']
-            offset_y = self.config['OFFSET_Y']
+        # if self.config['USE_XVFB']:
+        #     offset_x = 0
+        #     offset_y = 0
+        # else:
+        #     offset_x = self.config['OFFSET_X']
+        #     offset_y = self.config['OFFSET_Y']
 
 
 #        print(image_array)
 
-        image_array = \
-            np.array(self.mss_grabber.grab({"top": offset_y,
-                                            "left": offset_x,
-                                            "width": SCR_W,
-                                            "height": SCR_H}),
-                     dtype=np.uint8)
+        # image_array = \
+        #     np.array(self.mss_grabber.grab({"top": offset_y,
+        #                                     "left": offset_x,
+        #                                     "width": SCR_W,
+        #                                     "height": SCR_H}),
+        #              dtype=np.uint8)
 
-        # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
-        self.pixel_array = np.flip(image_array[:, :, :3], 2)
+        # # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
+        # self.pixel_array = np.flip(image_array[:, :, :3], 2)
+        if self.res_w == 170:
+            image += [0] * 170 * 3
+        self.pixel_array = np.array(image, dtype=np.uint8).reshape(self.res_w, self.res_h, 3)
         return self.pixel_array
 
     @abc.abstractmethod
@@ -343,11 +348,15 @@ class Mupen64PlusEnv(gym.Env):
         self._stop_controller_server()
 
     def _start_controller_server(self):
+        num_pixels = self.res_w * self.res_h
+        if self.res_w == 170:
+            num_pixels -= 1
         server = ControllerUpdater(
             input_host='',
             input_port=self.input_port,  # gets port for external
             control_timeout=self.config['ACTION_TIMEOUT'],
-            frame_skip=self.frame_skip)  # TODO: Environment argument (with issue #26)
+            frame_skip=self.frame_skip,
+            num_pixels=num_pixels)  # TODO: Environment argument (with issue #26)
         print('ControllerUpdater started on port ', self.input_port)
         return server
 
@@ -368,6 +377,132 @@ class Mupen64PlusEnv(gym.Env):
                     pass
         raise Exception(
             f"cannot find any available port in range {port} - {port + max_ports_to_test}")
+
+    def start_container(self, 
+                        rom_name,
+                        gfx_plugin,
+                        input_driver_path,
+                        res_w=SCR_W,
+                        res_h=SCR_H,
+                        res_d=SCR_D):
+        
+        rom_path = os.path.abspath(
+            os.path.join(os.path.dirname(inspect.stack()[0][1]),
+                         '../ROMs',
+                         rom_name))
+
+        if not os.path.isfile(rom_path):
+            msg = "ROM not found: " + rom_path
+            cprint(msg, 'red')
+            rom_dir = Path(rom_path).parent
+            download = input(
+                "Do you want to download and extract the file? Y/N ")
+            if download == "Y":
+                download_url = "https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip"
+                os.system(f"wget {download_url} -O /tmp/marioKart.zip")
+                os.system(
+                    f"unzip /tmp/marioKart.zip -d {str(rom_dir.resolve())}")
+                os.system(
+                    f"mv '{str(rom_dir.resolve() / 'Mario Kart 64 (USA).n64')}' {rom_path}")
+                cprint("Rom file downloaded!")
+            else:
+                raise Exception(msg)
+
+        input_driver_path = os.path.abspath(
+            os.path.expanduser(input_driver_path))
+        if not os.path.isfile(input_driver_path):
+            msg = "Input driver not found: " + input_driver_path
+            cprint(msg, 'red')
+            raise Exception(msg)
+
+        benchmark_options = [
+            "--nospeedlimit",
+            "--set", f"Core[CountPerOp]={COUNTPEROP}",
+            # "--set", f"Core[DelaySI]=False",
+            # "--set", f"Video-Glide64[filtering]=0",
+            # "--set", f"Video-Glide64[fast_crc]=True",
+            # "--set", f"Video-Glide64[fb_hires]=False",
+            # "--set", "Video-Rice[ScreenUpdateSetting]=3",
+            # "--set", "Video-Rice[FastTextureLoading]=1",
+            # "--set", "Video-Rice[TextureQuality]=2",
+            # "--set", "Video-Rice[ColorQuality]=1",
+        ]
+
+        cmd = [self.config['MUPEN_CMD'],
+               # "--nospeedlimit",
+               "--nosaveoptions",
+               "--resolution",
+               "%ix%i" % (res_w, res_h),
+               "--gfx", gfx_plugin,
+               "--audio", "dummy",
+               "--set", f"Input-Bot-Control0[port]={self.input_port}",
+               "--input", input_driver_path,
+               rom_path]
+
+        if self.benchmark:
+            cmd = [cmd[0]] + benchmark_options + cmd[1:]
+
+        xvfb_proc = None
+        if self.config['USE_XVFB']:
+            # display_num = 0
+            # success = False
+            # If we couldn't find an open display number after 15 attempts, give up
+            # while not success and display_num <= 99:
+            display_num = 1
+            xvfb_cmd = [self.config['XVFB_CMD'],
+                        ":" + str(display_num),
+                        "-screen",
+                        "0",
+                        "%ix%ix%i" % (res_w, res_h, res_d * 8),
+                        "-noreset",
+                        "-fbdir",
+                        self.config['TMP_DIR']]
+            cmd = xvfb_cmd + ["&&", "sleep", "2", "&&"] + cmd
+
+            cprint('Starting xvfb with command: %s' % xvfb_cmd, 'yellow')
+
+            # xvfb_proc = subprocess.Popen(
+            #     xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
+
+            # time.sleep(2)  # Give xvfb a couple seconds to start up
+
+            # Poll the process to see if it exited early
+            # (most likely due to a server already active on the display_num)
+            # if xvfb_proc.poll() is None:
+            #     success = True
+
+            print('')  # new line
+
+            # if not success:
+            #     msg = "Failed to initialize Xvfb!"
+            #     cprint(msg, 'red')
+            #     raise Exception(msg)
+
+            os.environ["DISPLAY"] = ":" + str(display_num)
+            cprint('Using DISPLAY %s' % os.environ["DISPLAY"], 'blue')
+            cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
+
+            cmd = [self.config['VGLRUN_CMD'],
+                   "-d", ":" + str(display_num)] + cmd
+        # else:
+        #     cmd.append("--noosd")
+
+        cprint('Starting emulator with comand: %s' % cmd, 'yellow')
+
+        print("COMMAND: ", " ".join(cmd))
+
+        emulator_process = subprocess.Popen(cmd,
+                                            env=os.environ.copy(),
+                                            shell=False,
+                                            stderr=subprocess.STDOUT)
+
+        emu_mon = EmulatorMonitor()
+        monitor_thread = threading.Thread(target=emu_mon.monitor_emulator,
+                                          args=[emulator_process])
+        monitor_thread.daemon = True
+        monitor_thread.start()
+
+        return xvfb_proc, emulator_process
 
     def _start_emulator(self,
                         rom_name,
@@ -587,10 +722,11 @@ class ControllerState(object):
 
 class ControllerUpdater(object):
 
-    def __init__(self, input_host, input_port, control_timeout, frame_skip):
+    def __init__(self, input_host, input_port, control_timeout, frame_skip, num_pixels):
         self.control_timeout = control_timeout
         self.controls = ControllerState()
         self.input_host = input_host
+        self.image_buffer_size = num_pixels * 3
         self.input_port = input_port
         self.running = True
         self.frame_skip = frame_skip
@@ -606,13 +742,15 @@ class ControllerUpdater(object):
 
         try:
             self.socket.sendall(msg.encode())
-            self.socket.recv(1)
+            immage = self.socket.recv(self.image_buffer_size)
         except:
             # reconnect
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.input_host, self.input_port))
             self.socket.sendall(msg.encode())
-            self.socket.recv(1)
+            image = self.socket.recv(self.image_buffer_size)
+        return image
+        
 
     def shutdown(self):
         self.running = False
