@@ -80,8 +80,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS_CONSIDERED_STUCK = 5
-    MIN_PROGRESS = 1
+    AMOUNT_STEPS_CONSIDERED_STUCK =40
+    MIN_PROGRESS = 1.5
     
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -106,6 +106,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     def __init__(self, character='mario', course='LuigiRaceway', random_tracks=False, num_tracks=0, **kwargs):
         self._set_character(character)
         self._set_course(course)
+        self.use_strict_reset = True
         super(MarioKartEnv, self).__init__(**kwargs)
 
         self.end_race_pixel_color = self.END_RACE_PIXEL_COLORS[self.config["GFX_PLUGIN"]]
@@ -352,12 +353,18 @@ class MarioKartEnv(Mupen64PlusEnv):
         '''If progress of last x steps is smaller than treshhold, we are stuck'''
         if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
-        print(self.total_progress)
         # let the agent speedup first
-        if self.lap == 0 and self.total_progress < 120:
+        if self.use_strict_reset and self.total_progress > 120:
+            num_els = 7
+            last_els = self._last_progresses[len(self._last_progresses)-num_els:]
+            # some magic numbers, to abort as soon as slow driving is detected ;)
+            if (sum(last_els) / num_els) - min(last_els) < 0.25:
+                print(last_els)
+                cprint("aborting because too slow!", "cyan")
+                if wandb.run is not None:
+                    wandb.log({"env/episode-stop-reason": 0})
+                return True
             return False
-        # driving to slow
-        print(self._last_progresses)
         if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
             cprint("aborting because stuck!", "cyan")
             if wandb.run is not None:
