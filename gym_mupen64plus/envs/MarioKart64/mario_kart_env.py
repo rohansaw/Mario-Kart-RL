@@ -105,7 +105,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     #     640: [203, 51],
     # }
 
-    def __init__(self, character='mario', course='LuigiRaceway', input_port="8082", vnc_port="5009", random_tracks=False, **kwargs):
+    def __init__(self, character='mario', course='LuigiRaceway', input_port="8082", vnc_port="5009", random_tracks=False, num_tracks=0, **kwargs):
         self._set_character(character)
         self._set_course(course)
         super(MarioKartEnv, self).__init__(
@@ -126,8 +126,8 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.total_progress = 0
         self.step_count = 0
         self.checkpoints = self.CHECKPOINTS[self.res_w]
-        self.CHECKPOINT_LOCATIONS = list(
-            self._generate_checkpoints(*self.checkpoints))
+        self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
+        self.eligible_tracks = list(self.COURSES.keys())[:num_tracks] if num_tracks > 0 else list(self.COURSES.keys())
 
     def _load_config(self):
         self.config.update(yaml.safe_load(open(os.path.join(
@@ -200,7 +200,7 @@ class MarioKartEnv(Mupen64PlusEnv):
             # Make sure we don't skip frames while navigating the menus
             with self.controller_server.frame_skip_disabled():
                 if self.random_tracks:
-                    self._set_course(random.choice(list(self.COURSES.keys())))
+                    self._set_course(random.choice(self.eligible_tracks))
                     self._reset_during_race_change_course()
                 elif self.episode_completed:
                     self._reset_after_race()
@@ -271,22 +271,20 @@ class MarioKartEnv(Mupen64PlusEnv):
         if self.episode_completed:
             cprint("yayy, race completed!!")
             # Scale out the end reward based on the total steps to get here; the fewer steps, the higher the reward
-            # self.END_REWARD * (5000 / self.step_count) - 3000
-            reward_to_return = (self.APPROX_MAX_STEP_COUNT -
-                                self.step_count) + self.END_REWARD
+            # reward_to_return = (self.APPROX_MAX_STEP_COUNT - self.step_count) + self.END_REWARD #self.END_REWARD * (5000 / self.step_count) - 3000
+            reward_to_return = 5.0
         else:
             if cur_lap > self.lap:
                 self.lap = cur_lap
                 cprint('Lap %s!' % self.lap, 'green')
 
-                # Scale out the lap reward based on the steps to get here; the fewer steps, the higher the reward
-                # TODO: Figure out a good scale here... number of steps required per lap will vary depending on the course; don't want negative reward for completing a lap
-                reward_to_return = self.LAP_REWARD
+                    # Scale out the lap reward based on the steps to get here; the fewer steps, the higher the reward
+                    # reward_to_return = self.LAP_REWARD # TODO: Figure out a good scale here... number of steps required per lap will vary depending on the course; don't want negative reward for completing a lap
             progress = self._get_progress()
             self.total_progress += progress
             reward_factor = self.PROGRESS_REWARD if progress >= 0 else self.BACKWARDS_PUNISHMENT
             reward_to_return += progress * reward_factor + self.DEFAULT_STEP_REWARD
-        self.last_known_lap = cur_lap
+            self.last_known_lap = cur_lap
         # print("reward:", reward_to_return)
         # if reward_to_return > 1000:
         #     print("whaaa?")

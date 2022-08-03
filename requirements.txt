@@ -6,6 +6,5 @@ mss
 stable-baselines3
 wandb
 tensorboard            
-#bitorch
 wandb
-
+tqdm

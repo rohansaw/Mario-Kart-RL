@@ -31,7 +31,11 @@ class SmolActor(Module):
 
     def forward(self, x):
         # config.debug_activated = True
+        print("here")
         convoluted = self.convolution(x)
+        print("here1")
+        convoluted = convoluted.unsqueeze(0)
+        print(convoluted.shape)
         output, hidden = self.lstm1(convoluted)
         return self.classifier(hidden[0][-1]) # num actions x 1 
 
