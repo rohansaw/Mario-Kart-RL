@@ -351,6 +351,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         '''If progress of last x steps is smaller than treshhold, we are stuck'''
         if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
+        print(self.total_progress)
+        if self.lap == 0 and self.total_progress:
+            pass
         if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
             cprint("aborting because stuck!", "cyan")
             if wandb.run is not None:
