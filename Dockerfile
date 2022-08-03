@@ -1,5 +1,5 @@
 ################################################################
-FROM ubuntu:xenial-20170915 AS base
+FROM ubuntu:focal-20220801 AS base
 
 
 # Setup environment variables in a single layer
@@ -17,10 +17,18 @@ FROM base AS buildstuff
 
 RUN apt-get update && \
 	apt-get install -y \
-	build-essential apt-utils dpkg-dev libwebkitgtk-dev libjpeg-dev libtiff-dev libgtk2.0-dev \
-	libsdl1.2-dev libgstreamer-plugins-base0.10-dev libnotify-dev freeglut3 freeglut3-dev \
-	libjson-c2 libjson-c-dev \
-	git
+	build-essential dpkg-dev \
+        git \
+        python3 python3-pip python3-setuptools python3-dev \
+        wget \
+        xvfb libxv1 x11vnc \
+        imagemagick \
+        mupen64plus-data mupen64plus-ui-console \
+        nano \
+        ffmpeg \
+        libjpeg-dev libtiff-dev libgtk2.0-dev \
+        libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
+        libjson-c-dev
 
 # clone, build, and install the input bot
 # (explicitly specifying commit hash to attempt to guarantee behavior within this container)
@@ -29,9 +37,9 @@ RUN git clone https://github.com/mupen64plus/mupen64plus-core && \
 	cd mupen64plus-core && \
 	git reset --hard 12d136dd9a54e8b895026a104db7c076609d11ff && \
 	cd .. && \
-	git clone https://github.com/kevinhughes27/mupen64plus-input-bot && \
+	git clone https://github.com/Snagnar/mupen64plus-input-bot && \
 	cd mupen64plus-input-bot && \
-	git reset --hard 0a1432035e2884576671ef9777a2047dc6c717a2 && \
+	git checkout feature/image-retrieval && \
 	make all && \
 	make install
 
@@ -43,20 +51,19 @@ FROM base
 # Update package cache and install dependencies
 RUN apt-get update && \
 	apt-get install -y \
-	python3 \
-	python3-pip \
-	python-dev \
-	wget \
-	xvfb libxv1 x11vnc \
-	imagemagick \
-	mupen64plus \
-	nano \
-	ffmpeg \
-	libjson-c2
-#RUN pip3 install -U  --upgrade pip
-# Upgrade pip (pip 21.0 dropped support for Python 2.7 in January 2021 - https://stackoverflow.com/a/65896996/9526448)
-# TODO: Python3 upgrade - https://github.com/bzier/gym-mupen64plus/issues/81
-#RUN pip install --upgrade "pip < 21.0"
+	build-essential dpkg-dev \
+        git \
+        python3 python3-pip python3-setuptools python3-dev \
+        wget \
+        xvfb libxv1 x11vnc \
+        imagemagick \
+        mupen64plus-data mupen64plus-ui-console \
+        nano \
+        ffmpeg \
+        libjpeg-dev libtiff-dev libgtk2.0-dev \
+        libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
+        libjson-c-dev
+
 
 # Install VirtualGL (provides vglrun to allow us to run the emulator in XVFB)
 # (Check for new releases here: https://github.com/VirtualGL/virtualgl/releases)
@@ -65,37 +72,24 @@ RUN wget "https://sourceforge.net/projects/virtualgl/files/${VIRTUALGL_VERSION}/
 	apt install ./virtualgl_${VIRTUALGL_VERSION}_amd64.deb && \
 	rm virtualgl_${VIRTUALGL_VERSION}_amd64.deb
 
-# Install dependencies (here for caching)
 
-#RUN pip install \
-#	gym==0.7.4 \
-#	numpy==1.16.2 \
-#	PyYAML==5.1 \
-#	termcolor==1.1.0 \
-#	mss==4.0.2 \
-#	opencv-python==4.1.0.25 \
-#	pyglet==1.2.0
-
-RUN pip3 install mss 
-#numpy
 
 # Copy compiled input plugin from buildstuff layer
 COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/local/lib/mupen64plus/
 
 # Copy the gym environment (current directory)
 COPY . /src/gym-mupen64plus
-COPY ./src/server.py ./src/server.py
-COPY ./src/pythonServer.py ./src/pythonServer.py
 
 # Install requirements & this package
-#WORKDIR /src/gym-mupen64plus
-#RUN pip install -e .
+WORKDIR /src/gym-mupen64plus
+RUN pip3 install --upgrade pip
+RUN ls
+RUN pip3 install -e .
 
 # Declare ROMs as a volume for mounting a host path outside the container
 VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
 
-WORKDIR /src
+RUN pip3 install torch==1.12.0+cu113 torchvision==0.13.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+
 # Expose the default VNC port for connecting with a client/viewer outside the container
-EXPOSE 5900
 EXPOSE 8082
-EXPOSE 8070

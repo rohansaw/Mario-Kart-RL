@@ -1,3 +1,4 @@
+import uuid
 import mss
 import numpy as np
 from gym.utils import seeding
@@ -70,7 +71,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, input_port="8082", vnc_port="5009", benchmark=True, resolution="supersmall", res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
+    def __init__(self, input_port="8082", vnc_port="5009", benchmark=True, resolution="supersmall", containerized=True, res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
             self.res_w = res_w
@@ -83,7 +84,7 @@ class Mupen64PlusEnv(gym.Env):
         self.episode_length = base_episode_length
         self.episode_length_increase = episode_length_increase
 
-        self.input_port = input_port
+        self.input_port = self._next_free_port(int(input_port))
         self.vnc_port = vnc_port
         self.viewer = None
         self.benchmark = benchmark
@@ -99,6 +100,7 @@ class Mupen64PlusEnv(gym.Env):
         self.max_reward = 0
         self.total_progress = 0
         self.pixel_array = None
+        self.container_name = ""
         self.gray_scale = gray_scale
         self._base_load_config()
         self._base_validate_config()
@@ -116,24 +118,33 @@ class Mupen64PlusEnv(gym.Env):
         # If the EXTERNAL_EMULATOR environment variable is True, we are running the
         # emulator out-of-process (likely via docker/docker-compose). If not, we need
         # to start the emulator in-process here
-        external_emulator = "EXTERNAL_EMULATOR" in os.environ and os.environ[
-            "EXTERNAL_EMULATOR"] == 'True'
-        if not external_emulator:
-            self.xvfb_process, self.emulator_process = \
-                self._start_emulator(rom_name=self.config['ROM_NAME'],
-                                     gfx_plugin=self.config['GFX_PLUGIN'],
-                                     input_driver_path=self.config['INPUT_DRIVER_PATH'],
-                                     res_w=SCR_W, res_h=SCR_H, res_d=SCR_D)
-        self.start_emulator_container()
+        # external_emulator = "EXTERNAL_EMULATOR" in os.environ and os.environ[
+        #     "EXTERNAL_EMULATOR"] == 'True'
+        if containerized:
+            self.start_container(
+                rom_name=self.config['ROM_NAME'],
+                gfx_plugin=self.config['GFX_PLUGIN'],
+                input_driver_path=self.config['INPUT_DRIVER_PATH'],
+                res_w=SCR_W, res_h=SCR_H, res_d=SCR_D,
+                image=self.config["IMAGE_SPEC"],
+            )
+        else:
+            self.emulator_process = \
+                self._start_emulator(
+                    rom_name=self.config['ROM_NAME'],
+                    gfx_plugin=self.config['GFX_PLUGIN'],
+                    input_driver_path=self.config['INPUT_DRIVER_PATH'],
+                    res_w=SCR_W, res_h=SCR_H, res_d=SCR_D
+            )
 
         # TODO: Test and cleanup:
         # May need to initialize this after the DISPLAY env var has been set
         # so it attaches to the correct X display; otherwise screenshots may
         # come from the wrong place. This used to be true when we were using
         # wxPython for screenshots. Untested after switching to mss.
-        cprint('Calling mss.mss() with DISPLAY %s' %
-               os.environ["DISPLAY"], 'red')
-        self.mss_grabber = mss.mss()
+        # cprint('Calling mss.mss() with DISPLAY %s' %
+        #        os.environ["DISPLAY"], 'red')
+        # self.mss_grabber = mss.mss()
         # Give mss a couple seconds to initialize; also may not be necessary
         time.sleep(2)
 
@@ -255,7 +266,9 @@ class Mupen64PlusEnv(gym.Env):
             self._act(button)  # Press
             self._act(ControllerState.NO_OP)  # and release
 
-    def _observe(self, image):
+    def _observe(self, image=None):
+        if image is None:
+            image = self._act([0] * 16)
         # cprint('Observe called!', 'yellow')
 
         # if self.config['USE_XVFB']:
@@ -278,8 +291,11 @@ class Mupen64PlusEnv(gym.Env):
         # # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
         # self.pixel_array = np.flip(image_array[:, :, :3], 2)
         if self.res_w == 170:
-            image += [0] * 170 * 3
-        self.pixel_array = np.array(image, dtype=np.uint8).reshape(self.res_w, self.res_h, 3)
+            image += b'\xff' * 170 * 3
+        print()
+        arr = np.frombuffer(image, dtype=np.uint8)
+        print("nonzero:", (arr != 0).sum())
+        self.pixel_array = np.frombuffer(image, dtype=np.uint8).reshape(self.res_w, self.res_h, 3)
         return self.pixel_array
 
     @abc.abstractmethod
@@ -378,23 +394,25 @@ class Mupen64PlusEnv(gym.Env):
         raise Exception(
             f"cannot find any available port in range {port} - {port + max_ports_to_test}")
 
-    def start_container(self, 
+    def start_container(self,
                         rom_name,
                         gfx_plugin,
                         input_driver_path,
+                        image,
                         res_w=SCR_W,
                         res_h=SCR_H,
                         res_d=SCR_D):
+        self.container_name = f"Mario-Kart-Env-Container-{str(uuid.uuid4())[:4]}"
         
         rom_path = os.path.abspath(
             os.path.join(os.path.dirname(inspect.stack()[0][1]),
                          '../ROMs',
                          rom_name))
 
+        rom_dir = Path(rom_path).parent
         if not os.path.isfile(rom_path):
             msg = "ROM not found: " + rom_path
             cprint(msg, 'red')
-            rom_dir = Path(rom_path).parent
             download = input(
                 "Do you want to download and extract the file? Y/N ")
             if download == "Y":
@@ -437,53 +455,63 @@ class Mupen64PlusEnv(gym.Env):
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
                "--input", input_driver_path,
-               rom_path]
+               "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
 
         if self.benchmark:
             cmd = [cmd[0]] + benchmark_options + cmd[1:]
 
-        xvfb_proc = None
-        if self.config['USE_XVFB']:
-            # display_num = 0
-            # success = False
-            # If we couldn't find an open display number after 15 attempts, give up
-            # while not success and display_num <= 99:
-            display_num = 1
-            xvfb_cmd = [self.config['XVFB_CMD'],
-                        ":" + str(display_num),
-                        "-screen",
-                        "0",
-                        "%ix%ix%i" % (res_w, res_h, res_d * 8),
-                        "-noreset",
-                        "-fbdir",
-                        self.config['TMP_DIR']]
-            cmd = xvfb_cmd + ["&&", "sleep", "2", "&&"] + cmd
+        xvfb_cmd = ["docker",
+                    "run", 
+                    "--name",
+                    self.container_name,
+                    "-p",
+                    str(self.input_port) + ":" + str(self.input_port),
+                    "-v",
+                    str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
+                    "-dti",
+                    image,
+                    self.config['XVFB_CMD'],
+                    ":1",
+                    "-screen",
+                    "0",
+                    "%ix%ix%i" % (res_w, res_h, res_d * 8),
+                    "-noreset",
+                    "-fbdir",
+                    self.config['TMP_DIR']]
+        print("docker start command:", " ".join(xvfb_cmd))
+        
+        subprocess.run(xvfb_cmd)
 
-            cprint('Starting xvfb with command: %s' % xvfb_cmd, 'yellow')
+        cprint('Starting xvfb with command: %s' % xvfb_cmd, 'yellow')
 
-            # xvfb_proc = subprocess.Popen(
-            #     xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
+        # xvfb_proc = subprocess.Popen(
+        #     xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
 
-            # time.sleep(2)  # Give xvfb a couple seconds to start up
+        time.sleep(2)  # Give xvfb a couple seconds to start up
 
-            # Poll the process to see if it exited early
-            # (most likely due to a server already active on the display_num)
-            # if xvfb_proc.poll() is None:
-            #     success = True
+        # Poll the process to see if it exited early
+        # (most likely due to a server already active on the display_num)
+        # if xvfb_proc.poll() is None:
+        #     success = True
 
-            print('')  # new line
+        print('')  # new line
 
-            # if not success:
-            #     msg = "Failed to initialize Xvfb!"
-            #     cprint(msg, 'red')
-            #     raise Exception(msg)
+        # if not success:
+        #     msg = "Failed to initialize Xvfb!"
+        #     cprint(msg, 'red')
+        #     raise Exception(msg)
 
-            os.environ["DISPLAY"] = ":" + str(display_num)
-            cprint('Using DISPLAY %s' % os.environ["DISPLAY"], 'blue')
-            cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
+        # os.environ["DISPLAY"] = ":" + str(display_num)
+        # cprint('Using DISPLAY %s' % os.environ["DISPLAY"], 'blue')
+        # cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
 
-            cmd = [self.config['VGLRUN_CMD'],
-                   "-d", ":" + str(display_num)] + cmd
+        cmd = [
+            "docker",
+            "exec",
+            "-te", "DISPLAY=:1",
+            self.container_name,
+            self.config['VGLRUN_CMD'],
+                "-d", ":1"] + cmd
         # else:
         #     cmd.append("--noosd")
 
@@ -492,8 +520,6 @@ class Mupen64PlusEnv(gym.Env):
         print("COMMAND: ", " ".join(cmd))
 
         emulator_process = subprocess.Popen(cmd,
-                                            env=os.environ.copy(),
-                                            shell=False,
                                             stderr=subprocess.STDOUT)
 
         emu_mon = EmulatorMonitor()
@@ -502,7 +528,7 @@ class Mupen64PlusEnv(gym.Env):
         monitor_thread.daemon = True
         monitor_thread.start()
 
-        return xvfb_proc, emulator_process
+        return emulator_process
 
     def _start_emulator(self,
                         rom_name,
@@ -635,8 +661,9 @@ class Mupen64PlusEnv(gym.Env):
             self._act(ControllerState.NO_OP)
             if self.emulator_process is not None:
                 self.emulator_process.kill()
-            if self.xvfb_process is not None:
-                self.xvfb_process.terminate()
+            # if self.xvfb_process is not None:
+            #     self.xvfb_process.terminate()
+            subprocess.run(["docker", "kill", self.container_name])
         except AttributeError:
             pass  # We may be shut down during intialization before these attributes have been set
 
@@ -742,11 +769,11 @@ class ControllerUpdater(object):
 
         try:
             self.socket.sendall(msg.encode())
-            immage = self.socket.recv(self.image_buffer_size)
+            image = self.socket.recv(self.image_buffer_size)
         except:
             # reconnect
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.input_host, self.input_port))
+            self.socket.connect((self.input_host, int(self.input_port)))
             self.socket.sendall(msg.encode())
             image = self.socket.recv(self.image_buffer_size)
         return image
