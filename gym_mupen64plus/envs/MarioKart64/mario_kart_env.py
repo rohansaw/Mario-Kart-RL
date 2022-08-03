@@ -103,7 +103,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     #     640: [203, 51],
     # }
 
-    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=False, **kwargs):
+    def __init__(self, character='mario', course='LuigiRaceway', random_tracks=False, num_tracks=0, **kwargs):
         self._set_character(character)
         self._set_course(course)
         super(MarioKartEnv, self).__init__(**kwargs)
@@ -124,6 +124,7 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.step_count = 0
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
+        self.eligible_tracks = list(self.COURSES.keys())[:num_tracks] if num_tracks > 0 else list(self.COURSES.keys())
 
     def _load_config(self):
         self.config.update(yaml.safe_load(open(os.path.join(os.path.dirname(inspect.stack()[0][1]), "mario_kart_config.yml"))))
@@ -189,7 +190,7 @@ class MarioKartEnv(Mupen64PlusEnv):
             # Make sure we don't skip frames while navigating the menus
             with self.controller_server.frame_skip_disabled():
                 if self.random_tracks:
-                    self._set_course(random.choice(list(self.COURSES.keys())))
+                    self._set_course(random.choice(self.eligible_tracks))
                     self._reset_during_race_change_course()
                 elif self.episode_completed:
                     self._reset_after_race()

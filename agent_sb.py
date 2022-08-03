@@ -19,10 +19,10 @@ from wandb.integration.sb3 import WandbCallback
 os.environ['DISPLAY'] = ':0'
 
 SEED = 123
-def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, seed=SEED):
+def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, seed=SEED, **kwargs):
     Path(video_store_path).mkdir(parents=True, exist_ok=True)
     def f():
-        env = gym.make(mario_kart_envs[i])
+        env = gym.make(mario_kart_envs[i], **kwargs)
         env.seed(seed + 2 ** i)
         check_env(env)
         env = Monitor(env)
@@ -52,7 +52,17 @@ def main(args):
     mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
     print("available envs:", mario_kart_envs)
     
-    env = DummyVecEnv([make_env(0, mario_kart_envs, args.video_record_frequency, args.video_record_path)])
+    env = DummyVecEnv([
+        make_env(
+            0,
+            mario_kart_envs,
+            args.video_record_frequency,
+            args.video_record_path,
+            random_tracks=args.random_tracks,
+            auto_abort=args.auto_abort,
+            num_tracks=args.num_tracks,
+        )
+    ])
     env.reset()
 
     if args.from_pretrained is None:
@@ -82,6 +92,9 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser("stable baselines for mario kart")
     parser.add_argument("--wandb", action="store_true", default=False, help="toggles weather to log to wandb or not")
+    parser.add_argument("--random-tracks", action="store_true", default=False, help="toggles weather to train model on random tracks")
+    parser.add_argument("--auto-abort", action="store_true", default=False, help="toggles weather to abort episode if stuck")
+    parser.add_argument("--num-tracks", type=int, default=2)
     parser.add_argument("--evaluate-after-training", action="store_true", default=False, help="toggles weather to evaluate model after training finished")
     parser.add_argument("--steps", type=int, default=10_000_000, help="number of steps to train")
     parser.add_argument("--batch-size", type=int, default=64)
