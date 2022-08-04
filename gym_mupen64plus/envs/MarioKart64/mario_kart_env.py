@@ -81,7 +81,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     ENABLE_CHECKPOINTS = False
 
     AMOUNT_STEPS_CONSIDERED_STUCK = 40
-    AMOUNT_STEPS_STUCK_STRICT = 7
+    AMOUNT_STEPS_STUCK_STRICT = 10
     MIN_PROGRESS = 1.5
     
     CHECKPOINTS = {
@@ -365,8 +365,9 @@ class MarioKartEnv(Mupen64PlusEnv):
         if self.use_strict_reset and self.total_progress > 120 and not self._close_to_lap_end():
             num_els = self.AMOUNT_STEPS_STUCK_STRICT
             last_els = self._last_progresses[len(self._last_progresses)-num_els:]
+
             # some magic numbers, to abort as soon as slow driving is detected ;)
-            if (sum(last_els) / num_els) - min(last_els) < 0.25:
+            if (sum(last_els) / num_els) - min(last_els) < 0.1:
                 cprint("aborting because too slow!", "cyan")
                 if wandb.run is not None:
                     wandb.log({"env/episode-stop-reason": 0})

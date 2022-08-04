@@ -8,7 +8,7 @@
             "name": "Agent.py",
             "type": "python",
             "request": "launch",
-            "program": "agent_sb.py",
+            "program": "agent_demo.py",
             "console": "integratedTerminal",
             // "args": ["--device", "cuda:0", "--graphic-output"],
             "justMyCode": false

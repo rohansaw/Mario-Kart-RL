@@ -7,7 +7,7 @@ import gym, gym_mupen64plus
 from gym_mupen64plus.envs.mupen64plus_env import COUNTPEROP, IMAGE_HELPER
 
 render = False
-render = True
+# render = True
 env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0', auto_abort=False, resolution="supersmall", base_episode_length=30000)
 # env.reset()
 # if render:
