@@ -80,7 +80,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS_CONSIDERED_STUCK =40
+    AMOUNT_STEPS_CONSIDERED_STUCK = 40
+    AMOUNT_STEPS_STUCK_STRICT = 7
     MIN_PROGRESS = 1.5
     
     CHECKPOINTS = {
@@ -349,17 +350,23 @@ class MarioKartEnv(Mupen64PlusEnv):
         # If all are good, return the corresponding value
         return self.HUD_PROGRESS_COLOR_VALUES[checkpoint_pixels[0]]
 
+    def _close_to_lap_end(self):
+        track_len = len(self.CHECKPOINT_LOCATIONS)
+        for i in [1,2,3]:
+            if self.total_progress > i*track_len - 10 and self.total_progress < i*track_len + 5:
+                return True
+        return False
+
     def _is_stuck(self):
         '''If progress of last x steps is smaller than treshhold, we are stuck'''
         if len(self._last_progresses) < self.AMOUNT_STEPS_CONSIDERED_STUCK:
             return False
         # let the agent speedup first
-        if self.use_strict_reset and self.total_progress > 120:
-            num_els = 7
+        if self.use_strict_reset and self.total_progress > 120 and not self._close_to_lap_end():
+            num_els = self.AMOUNT_STEPS_STUCK_STRICT
             last_els = self._last_progresses[len(self._last_progresses)-num_els:]
             # some magic numbers, to abort as soon as slow driving is detected ;)
             if (sum(last_els) / num_els) - min(last_els) < 0.25:
-                print(last_els)
                 cprint("aborting because too slow!", "cyan")
                 if wandb.run is not None:
                     wandb.log({"env/episode-stop-reason": 0})
