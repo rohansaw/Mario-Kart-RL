@@ -8,7 +8,7 @@ from gym_mupen64plus.envs.mupen64plus_env import COUNTPEROP, IMAGE_HELPER
 
 # render = False
 render = True
-env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0', containerized=False, auto_abort=False, resolution="supersmall", base_episode_length=30000)
+env = gym.make('Mario-Kart-Discrete-Luigi-Raceway-v0', containerized=True, auto_abort=False, resolution="supersmall", base_episode_length=30000)
 # env.reset()
 # if render:
 #     env.render()
@@ -66,15 +66,16 @@ for j in range(2):
         steps, action = segment
         for i in range(steps):
             # (obs, rew, end, info) = env.step([0, -80, 0, 1, 0]) # Drive straight
-            print("action:", action)
+            # print("action:", action)
             (obs, rew, end, info) = env.step(action) # Drive straight
-            print("rew:", rew)
+            # print("rew:", rew)
             if end:
                 print("isch over", i)
                 
                 break
             if render:
                 env.render()
+            # input("press enter")
             time.sleep(DELAY)
             rews.append(rew)
         total_steps += i

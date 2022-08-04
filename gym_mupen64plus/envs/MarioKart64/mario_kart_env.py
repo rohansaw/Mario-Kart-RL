@@ -394,7 +394,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _evaluate_end_state(self):
         # print(self._is_stuck())
         # print(self._last_progresses)
-        abort_episode = self._is_stuck() or self._went_backwards() or self._not_started_driving()
+        abort_episode = self.auto_abort and (self._is_stuck() or self._went_backwards() or self._not_started_driving())
         end_pixel = self.END_PIXELS[self.res_w]
         completed_episode = self.end_race_pixel_color == IMAGE_HELPER.GetPixelColor(
             self.pixel_array, *end_pixel)  # TODO: adjust for smaller resolutions
@@ -403,24 +403,31 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     def _navigate_menu(self):
         self._wait(count=10, wait_for='Nintendo screen')
+        # input("on nintendo screen")
         self._press_button(ControllerState.A_BUTTON)
 
         self._wait(count=68, wait_for='Mario Kart splash screen')
+        # input("on mario kart spash screen")
         self._press_button(ControllerState.A_BUTTON)
 
         self._wait(count=68, wait_for='Game Select screen')
+        # input("on game select screen screen")
         self._navigate_game_select()
 
         self._wait(count=14, wait_for='Player Select screen')
+        # input("on navigate player  screen")
         self._navigate_player_select()
 
         self._wait(count=31, wait_for='Map Select screen')
+        # input("on map select screen")
         self._navigate_map_select()
 
         self._wait(count=46, wait_for='race to load')
+        # input("on race screen")
 
         # Change HUD View twice to get to the one we want:
         self._cycle_hud_view(times=2)
+        # input("on hud right screen")
 
         # Now that we have the HUD as needed, reset the race so we have a consistent starting frame:
         self._reset_during_race()

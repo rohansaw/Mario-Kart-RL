@@ -15,8 +15,8 @@ ENV \
 ################################################################
 FROM base AS buildstuff
 
-RUN apt-get update && \
-	apt-get install -y \
+RUN apt update && \
+	apt install -y --no-install-recommends \
 	build-essential dpkg-dev \
         git \
         python3 python3-pip python3-setuptools python3-dev \
@@ -43,14 +43,15 @@ RUN git clone https://github.com/mupen64plus/mupen64plus-core && \
 	make all && \
 	make install
 
+WORKDIR /src/code
 
 ################################################################
 FROM base
 
 
 # Update package cache and install dependencies
-RUN apt-get update && \
-	apt-get install -y \
+RUN apt update && \
+	apt install -y --no-install-recommends \
 	build-essential dpkg-dev \
         git \
         python3 python3-pip python3-setuptools python3-dev \
@@ -82,14 +83,18 @@ COPY . /src/gym-mupen64plus
 
 # Install requirements & this package
 WORKDIR /src/gym-mupen64plus
-RUN pip3 install --upgrade pip
+RUN pip3 install --no-cache-dir --upgrade pip
 RUN ls
-RUN pip3 install -e .
+RUN pip3 install --no-cache-dir -e .
 
 # Declare ROMs as a volume for mounting a host path outside the container
 VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
+VOLUME /src/code
+WORKDIR /src/code
 
-RUN pip3 install torch==1.12.0+cu113 torchvision==0.13.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+
+RUN pip3 --no-cache-dir install torch==1.12.0+cu113 torchvision==0.13.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
 
 # Expose the default VNC port for connecting with a client/viewer outside the container
 EXPOSE 8082
+

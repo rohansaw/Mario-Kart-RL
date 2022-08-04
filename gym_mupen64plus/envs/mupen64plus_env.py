@@ -253,9 +253,10 @@ class Mupen64PlusEnv(gym.Env):
         else:
             image = self.controller_server.send_controls(ControllerState(
                 action), count=count, force_count=force_count)
+        # if image is not None:
+        #     self._observe(image)
+        #     self.render(mode="human")
         return image
-        # self.render(mode="human")
-        # time.sleep(0.2)
         # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
@@ -289,13 +290,13 @@ class Mupen64PlusEnv(gym.Env):
         #              dtype=np.uint8)
 
         # # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
-        # self.pixel_array = np.flip(image_array[:, :, :3], 2)
-        if self.res_w == 170:
-            image += b'\xff' * 170 * 3
-        print()
-        arr = np.frombuffer(image, dtype=np.uint8)
-        print("nonzero:", (arr != 0).sum())
-        self.pixel_array = np.frombuffer(image, dtype=np.uint8).reshape(self.res_w, self.res_h, 3)
+        # if self.res_w == 170:
+        #     image += b'\xff' * 170 * 3
+        # print()
+        # arr = np.frombuffer(image, dtype=np.uint8)
+        # print("nonzero:", (arr != 0).sum())
+        self.pixel_array = np.frombuffer(image, dtype=np.uint8).reshape(self.res_h - 1, self.res_w, 3)
+        self.pixel_array = np.flip(self.pixel_array[:, :, :3], 2)
         return self.pixel_array
 
     @abc.abstractmethod
@@ -364,9 +365,10 @@ class Mupen64PlusEnv(gym.Env):
         self._stop_controller_server()
 
     def _start_controller_server(self):
-        num_pixels = self.res_w * self.res_h
         if self.res_w == 170:
-            num_pixels -= 1
+            num_pixels = self.res_w * (self.res_h - 1)
+        else:
+            num_pixels = self.res_w * self.res_h
         server = ControllerUpdater(
             input_host='',
             input_port=self.input_port,  # gets port for external
@@ -454,7 +456,8 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-               "--input", input_driver_path,
+               "--input", "/src/code/install/mupen64plus-input-bot/mupen64plus-input-bot.so",
+            #    "--input", input_driver_path,
                "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
 
         if self.benchmark:
@@ -464,11 +467,13 @@ class Mupen64PlusEnv(gym.Env):
                     "run", 
                     "--name",
                     self.container_name,
-                    "-p",
+                    "-t", "-p",
                     str(self.input_port) + ":" + str(self.input_port),
                     "-v",
                     str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
-                    "-dti",
+                    "-v",
+                    "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
+                    "-di",
                     image,
                     self.config['XVFB_CMD'],
                     ":1",
@@ -487,7 +492,7 @@ class Mupen64PlusEnv(gym.Env):
         # xvfb_proc = subprocess.Popen(
         #     xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
 
-        time.sleep(2)  # Give xvfb a couple seconds to start up
+        time.sleep(3)  # Give xvfb a couple seconds to start up
 
         # Poll the process to see if it exited early
         # (most likely due to a server already active on the display_num)
@@ -509,6 +514,7 @@ class Mupen64PlusEnv(gym.Env):
             "docker",
             "exec",
             "-te", "DISPLAY=:1",
+            "-e", "XVFB_FB_PATH=" + self.config["TMP_DIR"] + "/Xvfb_screen0",
             self.container_name,
             self.config['VGLRUN_CMD'],
                 "-d", ":1"] + cmd
@@ -632,7 +638,8 @@ class Mupen64PlusEnv(gym.Env):
             os.environ["DISPLAY"] = ":" + str(display_num)
             cprint('Using DISPLAY %s' % os.environ["DISPLAY"], 'blue')
             cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
-
+            
+            os.environ["XVFB_FB_PATH"] = self.config["TMP_DIR"] + "/Xvfb_screen0"
             cmd = [self.config['VGLRUN_CMD'],
                    "-d", ":" + str(display_num)] + cmd
         # else:
@@ -757,6 +764,7 @@ class ControllerUpdater(object):
         self.input_port = input_port
         self.running = True
         self.frame_skip = frame_skip
+        self.last_image = None
         self.frame_skip_enabled = True
 
     def send_controls(self, controls, count=None, force_count=False):
@@ -766,16 +774,42 @@ class ControllerUpdater(object):
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
         msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-
-        try:
-            self.socket.sendall(msg.encode())
-            image = self.socket.recv(self.image_buffer_size)
-        except:
-            # reconnect
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.input_host, int(self.input_port)))
-            self.socket.sendall(msg.encode())
-            image = self.socket.recv(self.image_buffer_size)
+        msg *= 4
+        msg = "#|" + msg
+        # fs = frame_skip if self.frame_skip_enabled or force_count else 0
+        # if fs > 0:
+        #     print("WAITING FRAME SKIP:", fs)
+        #     time.sleep(2)
+        image = "none".encode()
+        while (image == "none".encode() or len(image) < 10):
+            print("sending ", len(msg), "msg:", msg)
+            try:
+                # self.socket.sendall(str(len(msg)).encode())
+                self.socket.sendall(msg.encode())
+                # print("reading ", self.image_buffer_size, "bytes")
+                # im_len = self.socket.recv(self.image_buffer_size)
+                image = self.socket.recv(self.image_buffer_size)
+            except:
+                # reconnect
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.connect((self.input_host, int(self.input_port)))
+                
+                # self.socket.sendall(str(len(msg)).encode())
+                self.socket.sendall(msg.encode())
+                # print("reading ", self.image_buffer_size, "bytes")
+                # im_len = self.socket.recv(self.image_buffer_size)
+                image = self.socket.recv(self.image_buffer_size)
+            if len(image) < 100:
+                print("got image:", image)
+            
+        # time.sleep(0.5)
+        print("final image size: ", len(image))
+        if self.image_buffer_size != len(image):
+            print("######################################################### does not match!, using old image")
+            return self.last_image
+        self.last_image = image
+        # print(list(image)[:32])
+        # time.sleep(0.2)
         return image
         
 
