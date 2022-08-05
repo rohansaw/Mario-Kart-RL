@@ -71,7 +71,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, input_port="8082", vnc_port="5009", benchmark=True, resolution="supersmall", containerized=True, res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
+    def __init__(self, input_port="8032", vnc_port="5009", benchmark=True, resolution="supersmall", containerized=True, res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
             self.res_w = res_w
@@ -114,14 +114,9 @@ class Mupen64PlusEnv(gym.Env):
 
         initial_disp = os.environ["DISPLAY"]
         cprint('Initially on DISPLAY %s' % initial_disp, 'red')
-
-        # If the EXTERNAL_EMULATOR environment variable is True, we are running the
-        # emulator out-of-process (likely via docker/docker-compose). If not, we need
-        # to start the emulator in-process here
-        # external_emulator = "EXTERNAL_EMULATOR" in os.environ and os.environ[
-        #     "EXTERNAL_EMULATOR"] == 'True'
+        self.containerized = containerized
         if containerized:
-            self.start_container(
+            self.xvfb_process, self.emulator_process = self.start_container(
                 rom_name=self.config['ROM_NAME'],
                 gfx_plugin=self.config['GFX_PLUGIN'],
                 input_driver_path=self.config['INPUT_DRIVER_PATH'],
@@ -129,23 +124,12 @@ class Mupen64PlusEnv(gym.Env):
                 image=self.config["IMAGE_SPEC"],
             )
         else:
-            self.emulator_process = \
-                self._start_emulator(
+            self.xvfb_process, self.emulator_process = self._start_emulator(
                     rom_name=self.config['ROM_NAME'],
                     gfx_plugin=self.config['GFX_PLUGIN'],
                     input_driver_path=self.config['INPUT_DRIVER_PATH'],
                     res_w=SCR_W, res_h=SCR_H, res_d=SCR_D
             )
-
-        # TODO: Test and cleanup:
-        # May need to initialize this after the DISPLAY env var has been set
-        # so it attaches to the correct X display; otherwise screenshots may
-        # come from the wrong place. This used to be true when we were using
-        # wxPython for screenshots. Untested after switching to mss.
-        # cprint('Calling mss.mss() with DISPLAY %s' %
-        #        os.environ["DISPLAY"], 'red')
-        # self.mss_grabber = mss.mss()
-        # Give mss a couple seconds to initialize; also may not be necessary
         time.sleep(2)
 
         # Restore the DISPLAY env var
@@ -201,16 +185,8 @@ class Mupen64PlusEnv(gym.Env):
         return
 
     def _step(self, action):
-        # cprint('Step %i: %s' % (self.step_count, action), 'green')
-        # start = time.time()
         image = self._act(action)
-        # # end = time.time()
-        # print("step time:", end - start)
-        # # start = time.time()
         obs = self._observe(image)
-        # # end = time.time()
-        # print("observe time:", end - start)
-        # # start = time.time()
         if self.step_count >= self.episode_length:
             cprint("aborting episode due to max steps reached!", "cyan")
             self.episode_aborted = True
@@ -220,21 +196,14 @@ class Mupen64PlusEnv(gym.Env):
 
         if not self.auto_abort:
             self.episode_aborted = False
-        # # end = time.time()
-        # print("_evaluate_end_state time:", end - start)
-        # # start = time.time()
         reward = self._get_reward()
-        # # end = time.time()
-        # print("_get_reward time:", end - start)
 
         self.step_count += 1
-        # if self.episode_over:
         self.episode_reward += reward
 
         if self.gray_scale:
             obs = np.average(obs, axis=2, weights=[
                              0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
-            # self.pixel_array = np.dot(self.pixel_array[...,:3], [0.299, 0.587, 0.114])
         if self.episode_aborted:
             cprint("Episode aborted!", "cyan")
         if self.episode_completed:
@@ -244,20 +213,13 @@ class Mupen64PlusEnv(gym.Env):
         return obs, reward, self.episode_aborted or self.episode_completed, {}
 
     def _act(self, action, count=1, force_count=False):
-        # print("got action:", action, "count:", count)
         if not self.controller_server.frame_skip_enabled and not force_count:
-            # print("sending single passes")
             for _ in itertools.repeat(None, count):
                 image = self.controller_server.send_controls(ControllerState(action))
-            # print("sending...")
         else:
             image = self.controller_server.send_controls(ControllerState(
                 action), count=count, force_count=force_count)
-        # if image is not None:
-        #     self._observe(image)
-        #     self.render(mode="human")
         return image
-        # print("done.")
 
     def _wait(self, count=1, wait_for='Unknown'):
         self._act(ControllerState.NO_OP, count=count, force_count=True)
@@ -270,32 +232,12 @@ class Mupen64PlusEnv(gym.Env):
     def _observe(self, image=None):
         if image is None:
             image = self._act([0] * 16)
-        # cprint('Observe called!', 'yellow')
+        # somehow the fb for the smallest resolution is only (170, 127) pixels large, so we have to append a line.
+        # other resolutions are not affected by this bug.
+        if self.res_w == 170:
+            image += b'\xff' * 170 * 3
 
-        # if self.config['USE_XVFB']:
-        #     offset_x = 0
-        #     offset_y = 0
-        # else:
-        #     offset_x = self.config['OFFSET_X']
-        #     offset_y = self.config['OFFSET_Y']
-
-
-#        print(image_array)
-
-        # image_array = \
-        #     np.array(self.mss_grabber.grab({"top": offset_y,
-        #                                     "left": offset_x,
-        #                                     "width": SCR_W,
-        #                                     "height": SCR_H}),
-        #              dtype=np.uint8)
-
-        # # drop the alpha channel and flip red and blue channels (BGRA -> RGB)
-        # if self.res_w == 170:
-        #     image += b'\xff' * 170 * 3
-        # print()
-        # arr = np.frombuffer(image, dtype=np.uint8)
-        # print("nonzero:", (arr != 0).sum())
-        self.pixel_array = np.frombuffer(image, dtype=np.uint8).reshape(self.res_h - 1, self.res_w, 3)
+        self.pixel_array = np.frombuffer(image, dtype=np.uint8).reshape(self.res_h, self.res_w, 3)
         self.pixel_array = np.flip(self.pixel_array[:, :, :3], 2)
         return self.pixel_array
 
@@ -412,21 +354,7 @@ class Mupen64PlusEnv(gym.Env):
                          rom_name))
 
         rom_dir = Path(rom_path).parent
-        if not os.path.isfile(rom_path):
-            msg = "ROM not found: " + rom_path
-            cprint(msg, 'red')
-            download = input(
-                "Do you want to download and extract the file? Y/N ")
-            if download == "Y":
-                download_url = "https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip"
-                os.system(f"wget {download_url} -O /tmp/marioKart.zip")
-                os.system(
-                    f"unzip /tmp/marioKart.zip -d {str(rom_dir.resolve())}")
-                os.system(
-                    f"mv '{str(rom_dir.resolve() / 'Mario Kart 64 (USA).n64')}' {rom_path}")
-                cprint("Rom file downloaded!")
-            else:
-                raise Exception(msg)
+        self.check_rom_path(rom_path)
 
         input_driver_path = os.path.abspath(
             os.path.expanduser(input_driver_path))
@@ -456,8 +384,7 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-               "--input", "/src/code/install/mupen64plus-input-bot/mupen64plus-input-bot.so",
-            #    "--input", input_driver_path,
+               "--input", input_driver_path,
                "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
 
         if self.benchmark:
@@ -469,10 +396,10 @@ class Mupen64PlusEnv(gym.Env):
                     self.container_name,
                     "-t", "-p",
                     str(self.input_port) + ":" + str(self.input_port),
-                    "-v",
-                    str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
-                    "-v",
-                    "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
+                    # "-v",
+                    # str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
+                    # "-v",
+                    # "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
                     "-di",
                     image,
                     self.config['XVFB_CMD'],
@@ -483,32 +410,11 @@ class Mupen64PlusEnv(gym.Env):
                     "-noreset",
                     "-fbdir",
                     self.config['TMP_DIR']]
-        print("docker start command:", " ".join(xvfb_cmd))
         
         subprocess.run(xvfb_cmd)
 
-        cprint('Starting xvfb with command: %s' % xvfb_cmd, 'yellow')
-
-        # xvfb_proc = subprocess.Popen(
-        #     xvfb_cmd, shell=False, stderr=subprocess.STDOUT)
-
+        cprint('Starting xvfb with command: %s' % " ".join(xvfb_cmd), 'yellow')
         time.sleep(3)  # Give xvfb a couple seconds to start up
-
-        # Poll the process to see if it exited early
-        # (most likely due to a server already active on the display_num)
-        # if xvfb_proc.poll() is None:
-        #     success = True
-
-        print('')  # new line
-
-        # if not success:
-        #     msg = "Failed to initialize Xvfb!"
-        #     cprint(msg, 'red')
-        #     raise Exception(msg)
-
-        # os.environ["DISPLAY"] = ":" + str(display_num)
-        # cprint('Using DISPLAY %s' % os.environ["DISPLAY"], 'blue')
-        # cprint('Changed to DISPLAY %s' % os.environ["DISPLAY"], 'red')
 
         cmd = [
             "docker",
@@ -518,12 +424,8 @@ class Mupen64PlusEnv(gym.Env):
             self.container_name,
             self.config['VGLRUN_CMD'],
                 "-d", ":1"] + cmd
-        # else:
-        #     cmd.append("--noosd")
 
-        cprint('Starting emulator with comand: %s' % cmd, 'yellow')
-
-        print("COMMAND: ", " ".join(cmd))
+        cprint('Starting emulator with comand: %s' % " ".join(cmd), 'yellow')
 
         emulator_process = subprocess.Popen(cmd,
                                             stderr=subprocess.STDOUT)
@@ -534,21 +436,9 @@ class Mupen64PlusEnv(gym.Env):
         monitor_thread.daemon = True
         monitor_thread.start()
 
-        return emulator_process
+        return None, emulator_process
 
-    def _start_emulator(self,
-                        rom_name,
-                        gfx_plugin,
-                        input_driver_path,
-                        res_w=SCR_W,
-                        res_h=SCR_H,
-                        res_d=SCR_D):
-
-        rom_path = os.path.abspath(
-            os.path.join(os.path.dirname(inspect.stack()[0][1]),
-                         '../ROMs',
-                         rom_name))
-
+    def check_rom_path(self, rom_path):
         if not os.path.isfile(rom_path):
             msg = "ROM not found: " + rom_path
             cprint(msg, 'red')
@@ -565,6 +455,21 @@ class Mupen64PlusEnv(gym.Env):
                 cprint("Rom file downloaded!")
             else:
                 raise Exception(msg)
+
+    def _start_emulator(self,
+                        rom_name,
+                        gfx_plugin,
+                        input_driver_path,
+                        res_w=SCR_W,
+                        res_h=SCR_H,
+                        res_d=SCR_D):
+
+        rom_path = os.path.abspath(
+            os.path.join(os.path.dirname(inspect.stack()[0][1]),
+                         '../ROMs',
+                         rom_name))
+        self.check_rom_path(rom_path)
+
 
         input_driver_path = os.path.abspath(
             os.path.expanduser(input_driver_path))
@@ -668,9 +573,10 @@ class Mupen64PlusEnv(gym.Env):
             self._act(ControllerState.NO_OP)
             if self.emulator_process is not None:
                 self.emulator_process.kill()
-            # if self.xvfb_process is not None:
-            #     self.xvfb_process.terminate()
-            subprocess.run(["docker", "kill", self.container_name])
+            if self.xvfb_process is not None:
+                self.xvfb_process.terminate()
+            if self.containerized:
+                subprocess.run(["docker", "kill", self.container_name])
         except AttributeError:
             pass  # We may be shut down during intialization before these attributes have been set
 
@@ -755,6 +661,7 @@ class ControllerState(object):
 
 
 class ControllerUpdater(object):
+    BUFFER_SIZE = 4096
 
     def __init__(self, input_host, input_port, control_timeout, frame_skip, num_pixels):
         self.control_timeout = control_timeout
@@ -773,40 +680,54 @@ class ControllerUpdater(object):
         self.controls = controls
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
-        msg = "#|" + msg + f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-        # msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-        # msg *= 4
-        # msg = "#|" + msg
+        # msg = "#|" + msg + f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
+        msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
+        msg = "#|" + (msg * 3)
         # fs = frame_skip if self.frame_skip_enabled or force_count else 0
         # if fs > 0:
         #     print("WAITING FRAME SKIP:", fs)
         #     time.sleep(2)
         image = "none".encode()
-        # while (image == "none".encode() or len(image) < 10):
-        #     print("sending ", len(msg), "msg:", msg)
-        try:
-            # self.socket.sendall(str(len(msg)).encode())
-            self.socket.sendall(msg.encode())
-            # print("reading ", self.image_buffer_size, "bytes")
-            # im_len = self.socket.recv(self.image_buffer_size)
-            image = self.socket.recv(self.image_buffer_size)
-        except:
-            # reconnect
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.input_host, int(self.input_port)))
-            
-            # self.socket.sendall(str(len(msg)).encode())
-            self.socket.sendall(msg.encode())
-            # print("reading ", self.image_buffer_size, "bytes")
-            # im_len = self.socket.recv(self.image_buffer_size)
-            image = self.socket.recv(self.image_buffer_size)
+        while (image == "none".encode() or len(image) < 10):
+            # print("sending ", len(msg), "msg:", msg)
+            try:
+                # self.socket.sendall(str(len(msg)).encode())
+                self.socket.sendall(msg.encode())
+                # print("reading ", self.image_buffer_size, "bytes")
+                # im_len = self.socket.recv(self.image_buffer_size)
+                # image = self.socket.recv(self.image_buffer_size)
+            except:
+                # reconnect
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.connect((self.input_host, int(self.input_port)))
+                
+                # self.socket.sendall(str(len(msg)).encode())
+                self.socket.sendall(msg.encode())
+                # while True:
+                #     content = self.socket.recv(self.image_buffer_size)
+                #     if not content:
+                #         break
+                #     image += content
+            image = b''
+            while True:
+                content = self.socket.recv(self.BUFFER_SIZE)
+                # print("got content", len(content))
+                if not content:
+                    break
+                image += content
+                if len(content) < self.BUFFER_SIZE:
+                    break
             # if len(image) < 100:
             #     print("got image:", image)
-            
+            #     time.sleep(3)
+        if len(image) > self.image_buffer_size:
+            # print("got .... more? ")
+            image = image[:self.image_buffer_size]
+            # image = np.frombuffer(image, dtype=np.uint8)[:self.image_buffer_size].tobytes()
         # time.sleep(0.5)
         # print("final image size: ", len(image))
         if self.image_buffer_size != len(image):
-            print("######################################################### does not match!, using old image")
+            # print("######################################################### does not match!, using old image")
             return self.last_image
         self.last_image = image
         # print(list(image)[:32])

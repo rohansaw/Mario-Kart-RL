@@ -25,6 +25,7 @@ RUN apt update && \
         imagemagick \
         mupen64plus-data mupen64plus-ui-console \
         nano \
+        unzip \
         ffmpeg \
         libjpeg-dev libtiff-dev libgtk2.0-dev \
         libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
@@ -60,6 +61,7 @@ RUN apt update && \
         imagemagick \
         mupen64plus-data mupen64plus-ui-console \
         nano \
+        unzip \
         ffmpeg \
         libjpeg-dev libtiff-dev libgtk2.0-dev \
         libsdl2-dev libnotify-dev freeglut3 freeglut3-dev \
@@ -87,10 +89,13 @@ RUN pip3 install --no-cache-dir --upgrade pip
 RUN ls
 RUN pip3 install --no-cache-dir -e .
 
+RUN wget https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip -O /tmp/marioKart.zip && \
+        unzip /tmp/marioKart.zip -d /src/gym-mupen64plus/gym_mupen64plus/ROMs/ && \
+        mv "/src/gym-mupen64plus/gym_mupen64plus/ROMs/Mario Kart 64 (USA).n64" /src/gym-mupen64plus/gym_mupen64plus/ROMs/marioKart.n64
 # Declare ROMs as a volume for mounting a host path outside the container
-VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
-VOLUME /src/code
-WORKDIR /src/code
+# VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
+# VOLUME /src/code
+# WORKDIR /src/code
 
 
 RUN pip3 --no-cache-dir install torch==1.12.0+cu113 torchvision==0.13.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
