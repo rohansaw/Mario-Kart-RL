@@ -773,37 +773,38 @@ class ControllerUpdater(object):
         self.controls = controls
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
-        msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-        msg *= 4
-        msg = "#|" + msg
+        msg = "#|" + msg + f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
+        # msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
+        # msg *= 4
+        # msg = "#|" + msg
         # fs = frame_skip if self.frame_skip_enabled or force_count else 0
         # if fs > 0:
         #     print("WAITING FRAME SKIP:", fs)
         #     time.sleep(2)
         image = "none".encode()
-        while (image == "none".encode() or len(image) < 10):
-            print("sending ", len(msg), "msg:", msg)
-            try:
-                # self.socket.sendall(str(len(msg)).encode())
-                self.socket.sendall(msg.encode())
-                # print("reading ", self.image_buffer_size, "bytes")
-                # im_len = self.socket.recv(self.image_buffer_size)
-                image = self.socket.recv(self.image_buffer_size)
-            except:
-                # reconnect
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.socket.connect((self.input_host, int(self.input_port)))
-                
-                # self.socket.sendall(str(len(msg)).encode())
-                self.socket.sendall(msg.encode())
-                # print("reading ", self.image_buffer_size, "bytes")
-                # im_len = self.socket.recv(self.image_buffer_size)
-                image = self.socket.recv(self.image_buffer_size)
-            if len(image) < 100:
-                print("got image:", image)
+        # while (image == "none".encode() or len(image) < 10):
+        #     print("sending ", len(msg), "msg:", msg)
+        try:
+            # self.socket.sendall(str(len(msg)).encode())
+            self.socket.sendall(msg.encode())
+            # print("reading ", self.image_buffer_size, "bytes")
+            # im_len = self.socket.recv(self.image_buffer_size)
+            image = self.socket.recv(self.image_buffer_size)
+        except:
+            # reconnect
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.input_host, int(self.input_port)))
+            
+            # self.socket.sendall(str(len(msg)).encode())
+            self.socket.sendall(msg.encode())
+            # print("reading ", self.image_buffer_size, "bytes")
+            # im_len = self.socket.recv(self.image_buffer_size)
+            image = self.socket.recv(self.image_buffer_size)
+            # if len(image) < 100:
+            #     print("got image:", image)
             
         # time.sleep(0.5)
-        print("final image size: ", len(image))
+        # print("final image size: ", len(image))
         if self.image_buffer_size != len(image):
             print("######################################################### does not match!, using old image")
             return self.last_image
