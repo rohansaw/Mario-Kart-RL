@@ -6,10 +6,10 @@ import time
 import os
 
 from stable_baselines3 import A2C, PPO
+from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import VecVideoRecorder, SubprocVecEnv, DummyVecEnv
 import wandb
 from gym.envs import registry
@@ -22,11 +22,13 @@ SEED = 123
 def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, seed=SEED, **kwargs):
     Path(video_store_path).mkdir(parents=True, exist_ok=True)
     def f():
-        env = gym.make(mario_kart_envs[i], **kwargs)
+        time.sleep(10 * i)
+        # time.sleep(12 * i + 1.3 ** i)
+        env = gym.make(mario_kart_envs[i], input_port=8030 + i, **kwargs)
         env.seed(seed + 2 ** i)
         check_env(env)
         env = Monitor(env)
-        env = gym.wrappers.RecordVideo(env, video_store_path, episode_trigger=lambda x: x % video_record_frequency == 0)
+        env = gym.wrappers.RecordVideo(env, video_store_path, name_prefix=f"env-{i}-rl-video", episode_trigger=lambda x: x % video_record_frequency == 0)
         return env
     set_random_seed(seed)
     return f
@@ -52,18 +54,20 @@ def main(args):
     mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
     print("available envs:", mario_kart_envs)
     
-    env = DummyVecEnv([
+    env = SubprocVecEnv([
         make_env(
-            0,
+            i,
             mario_kart_envs,
             args.video_record_frequency,
             args.video_record_path,
             random_tracks=args.random_tracks,
             auto_abort=args.auto_abort,
             num_tracks=args.num_tracks,
+            containerized=args.containerized,
         )
-    ])
+    for i in range(args.num_envs)])
     env.reset()
+    # print(env.render(mode="rgb_array"))
 
     if args.from_pretrained is None:
         model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=args.lr, n_steps=args.n_steps,
@@ -93,12 +97,14 @@ if __name__ == "__main__":
     parser = ArgumentParser("stable baselines for mario kart")
     parser.add_argument("--wandb", action="store_true", default=False, help="toggles weather to log to wandb or not")
     parser.add_argument("--random-tracks", action="store_true", default=False, help="toggles weather to train model on random tracks")
+    parser.add_argument("--containerized", action="store_true", default=False, help="toggles weather to abort episode if stuck")
     parser.add_argument("--auto-abort", action="store_true", default=False, help="toggles weather to abort episode if stuck")
     parser.add_argument("--num-tracks", type=int, default=2)
     parser.add_argument("--evaluate-after-training", action="store_true", default=False, help="toggles weather to evaluate model after training finished")
     parser.add_argument("--steps", type=int, default=10_000_000, help="number of steps to train")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--n-steps", type=int, default=256)
+    parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--n-epochs", type=int, default=10)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.95)

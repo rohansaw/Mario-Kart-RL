@@ -12,3 +12,21 @@ gym_mupen64plus/ROMs/*
 #   these to exist inside the image anyway
 README.md
 docs/
+
+*.pyc
+*.egg-info/
+
+install/
+log.log
+
+wandb
+venv
+__pycache__
+*.pckl
+.vscode
+videos
+runs
+recordings
+
+venv
+.venv*

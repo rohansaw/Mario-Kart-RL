@@ -8,3 +8,4 @@ wandb
 tensorboard            
 wandb
 tqdm
+pyglet
