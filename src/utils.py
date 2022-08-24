@@ -4,9 +4,23 @@ from typing import Union
 from pathlib import Path
 import json
 import logging
+import socket
 import time
 from math import floor
 
+def next_free_port(port, quiet=False):
+    max_ports_to_test = 200
+    for i in range(port, port + max_ports_to_test):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if not quiet:
+                print("trying out port", i, "...")
+            try:
+                s.bind(('localhost', i))
+                return i
+            except:
+                pass
+    raise Exception(
+        f"cannot find any available port in range {port} - {port + max_ports_to_test}")
 
 def set_logging(log_file: Union[None, str], log_level: str, output_stdout: bool) -> None:
     """configures logging module.

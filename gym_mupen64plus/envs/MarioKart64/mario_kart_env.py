@@ -186,8 +186,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     def _reset(self):
         if self.step_count > 0:
-            if wandb.run is not None:
-                wandb.log({"env/laps": self.lap, "env/progress": self.total_progress,
+            if self.use_wandb and self.run is not None:
+                self.run.log({"env/laps": self.lap, "env/progress": self.total_progress,
                           "env/prog_per_step": self.total_progress / self.step_count})
         self.lap = 0
         self.step_count_at_lap = 0
@@ -370,24 +370,24 @@ class MarioKartEnv(Mupen64PlusEnv):
             return False
         if (sum(self._last_progresses) / len(self._last_progresses)) - min(self._last_progresses) <= self.MIN_PROGRESS:
             cprint("aborting because stuck!", "cyan")
-            if wandb.run is not None:
-                wandb.log({"env/episode-stop-reason": 0})
+            if self.use_wandb and self.run is not None:
+                self.run.log({"env/episode-stop-reason": 0})
             return True
         return False
 
     def _went_backwards(self):
         if not all(self._last_progresses[i] <= self._last_progresses[i+5] for i in range(len(self._last_progresses) - 5)):
             cprint("aborting because went backwards!", "cyan")
-            if wandb.run is not None:
-                wandb.log({"env/episode-stop-reason": 1})
+            if self.use_wandb and self.run is not None:
+                self.run.log({"env/episode-stop-reason": 1})
             return True
         return False
 
     def _not_started_driving(self):
         if self.step_count > 300 and self.step_count < 500 and sum(self._last_progresses) < self.MIN_PROGRESS:
             cprint("aborting because not started driving", "cyan")
-            if wandb.run is not None:
-                wandb.log({"env/episode-stop-reason": 2})
+            if self.use_wandb and self.run is not None:
+                self.run.log({"env/episode-stop-reason": 2})
             return True
         return False
 
