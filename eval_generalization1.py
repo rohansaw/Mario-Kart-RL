@@ -102,7 +102,7 @@ def main(args):
     def wandb_callable(l, g):
         wandb.log({"eval/local": l, "eval/global": g})
 
-    for i in range(0, args.steps / 1000):
+    for i in range(0, int(args.steps / 1000)):
         env.reset()
         model.learn(total_timesteps=1000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
         eval_env.reset()
