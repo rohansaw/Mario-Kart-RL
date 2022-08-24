@@ -100,7 +100,7 @@ def main(args):
     model_store_path.mkdir(parents=True, exist_ok=True)
     
 
-    for i in range(0, args.step / 1000):
+    for i in range(0, args.steps / 1000):
         env.reset()
         model.learn(total_timesteps=1000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
         eval_env.reset()
