@@ -102,14 +102,11 @@ def main(args):
 
     for i in range(0, args.step / 1000):
         env.reset()
-        if i != 0:
-            model = PPO.load(model_store_path / "eval_gen_model", env=env)
         model.learn(total_timesteps=1000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
-        model.save(model_store_path / "eval_gen_model")
-        wandb.save(str(model_store_path / "eval_gen_model_wandb"))
         eval_env.reset()
         evaluate_policy(model, eval_env, callback=WandbCallback(verbose=2))
-
+    model.save(model_store_path / "eval_gen_model")
+    wandb.save(str(model_store_path / "eval_gen_model_wandb"))
     env.close()
     eval_env.close()
 
