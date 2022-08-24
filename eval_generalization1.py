@@ -99,15 +99,12 @@ def main(args):
     model_store_path = Path(args.model_store_path) / run_id
     model_store_path.mkdir(parents=True, exist_ok=True)
 
-    def wandb_callable(l, g):
-        wandb.log({"eval/localreward": l["reward"]})
-
-    for i in range(0, int(args.steps / 1000)):
+    for i in range(0, int(args.steps / 10000)):
         env.reset()
-        model.learn(total_timesteps=1000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
+        model.learn(total_timesteps=10000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
         eval_env.reset()
         res = evaluate_policy(model, eval_env)
-        wandb.log(res)
+        wandb.log({"eval/mean_reward" : res, "i": i})
 
     model.save(model_store_path / "eval_gen_model")
     wandb.save(str(model_store_path / "eval_gen_model_wandb"))
