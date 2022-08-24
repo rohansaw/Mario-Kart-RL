@@ -59,6 +59,8 @@ def main(args):
         run_id = "run"
         wandb_run = None
     
+    args.n_steps = int(args.n_steps / args.num_envs)
+    
     mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
     print("available envs:", mario_kart_envs)
     start_port = next_free_port(8030)

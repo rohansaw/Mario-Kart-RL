@@ -380,7 +380,8 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-               "--input", input_driver_path,
+            #    "--input", input_driver_path,
+               "--input", "/src/code/install/mupen64plus-input-bot/mupen64plus-input-bot.so",
                "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
 
         if self.benchmark:
@@ -390,12 +391,12 @@ class Mupen64PlusEnv(gym.Env):
                     "run", 
                     "--name",
                     self.container_name,
-                    "-p" if self.quiet else "-tp",
+                    "-p",
                     str(self.input_port) + ":" + str(self.input_port),
                     # "-v",
                     # str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
-                    # "-v",
-                    # "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
+                    "-v",
+                    "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
                     "-di",
                     image,
                     self.config['XVFB_CMD'],
@@ -408,14 +409,20 @@ class Mupen64PlusEnv(gym.Env):
                     self.config['TMP_DIR']]
         
         subprocess.run(xvfb_cmd, stderr=subprocess.STDOUT)
-
         cprint('Starting xvfb with command: %s' % " ".join(xvfb_cmd), 'yellow')
         time.sleep(3)  # Give xvfb a couple seconds to start up
+
+        log_cmd = ["docker", "logs", self.container_name]
+        print("quiet:", self.quiet)
+        cprint("running logs ", "yellow")
+
+        log_process = subprocess.run(log_cmd, stderr=subprocess.STDOUT)
+
 
         cmd = [
             "docker",
             "exec",
-            "-e" if self.quiet else "-dte", "DISPLAY=:1",
+            "-te", "DISPLAY=:1",
             "-e", "XVFB_FB_PATH=" + self.config["TMP_DIR"] + "/Xvfb_screen0",
             self.container_name,
             self.config['VGLRUN_CMD'],
@@ -423,9 +430,9 @@ class Mupen64PlusEnv(gym.Env):
 
         cprint('Starting emulator with comand: %s' % " ".join(cmd), 'yellow')
 
-        emulator_process = subprocess.run(cmd, stderr=subprocess.STDOUT)
-        # emulator_process = subprocess.Popen(cmd,
-        #                                     stderr=subprocess.STDOUT)
+        # emulator_process = subprocess.Popen(cmd, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL if self.quiet else sys.stdout)
+        emulator_process = subprocess.Popen(cmd, shell=False,
+                                            stderr=subprocess.STDOUT)
 
         # emu_mon = EmulatorMonitor()
         # monitor_thread = threading.Thread(target=emu_mon.monitor_emulator,
