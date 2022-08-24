@@ -396,7 +396,7 @@ class Mupen64PlusEnv(gym.Env):
                     # "-v",
                     # str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
                     "-v",
-                    "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
+                    "/home/Paul.Mattes/Mario-Kart-RL:/src/code",
                     "-di",
                     image,
                     self.config['XVFB_CMD'],
@@ -705,19 +705,19 @@ class ControllerUpdater(object):
                     try:
                         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         self.socket.connect((self.input_host, int(self.input_port)))
+                        self.socket.sendall(msg.encode())
+                        image = b''
+                        while True:
+                            content = self.socket.recv(self.BUFFER_SIZE)
+                            if not content:
+                                break
+                            image += content
+                            if len(content) < self.BUFFER_SIZE:
+                                break
                         break
                     except Exception as e:
                         cprint(f"cannot connect: {e}, retrying...")
                 
-                self.socket.sendall(msg.encode())
-                image = b''
-                while True:
-                    content = self.socket.recv(self.BUFFER_SIZE)
-                    if not content:
-                        break
-                    image += content
-                    if len(content) < self.BUFFER_SIZE:
-                        break
         if len(image) > self.image_buffer_size:
             image = image[:self.image_buffer_size]
         if self.image_buffer_size != len(image):
