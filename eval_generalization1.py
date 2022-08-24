@@ -79,18 +79,7 @@ def main(args):
     env.reset()
     # print(env.render(mode="rgb_array"))
 
-    model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=args.lr, n_steps=args.n_steps,
-                gamma=args.gamma, gae_lambda=args.gae_lambda, batch_size=args.batch_size, n_epochs=args.n_epochs, seed=SEED)
-
-    model_store_path = Path(args.model_store_path) / run_id
-    model_store_path.mkdir(parents=True, exist_ok=True)
-    
-    model.learn(total_timesteps=args.steps, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
-    model.save(model_store_path / "eval_gen_model")
-    wandb.save(str(model_store_path / "eval_gen_model_wandb"))
-    env.close()
-
-    env = SubprocVecEnv([
+    eval_env = SubprocVecEnv([
         make_env(
             i,
             mario_kart_envs,
@@ -103,9 +92,26 @@ def main(args):
             containerized=args.containerized
         )
     for i in range(0,1)])
-    env.reset()
-    evaluate_policy(model, env, callback=WandbCallback(verbose=2))
+
+    model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=args.lr, n_steps=args.n_steps,
+                gamma=args.gamma, gae_lambda=args.gae_lambda, batch_size=args.batch_size, n_epochs=args.n_epochs, seed=SEED)
+
+    model_store_path = Path(args.model_store_path) / run_id
+    model_store_path.mkdir(parents=True, exist_ok=True)
+    
+
+    for i in range(0, args.step / 1000):
+        env.reset()
+        if i != 0:
+            model = PPO.load(model_store_path / "eval_gen_model", env=env)
+        model.learn(total_timesteps=1000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
+        model.save(model_store_path / "eval_gen_model")
+        wandb.save(str(model_store_path / "eval_gen_model_wandb"))
+        eval_env.reset()
+        evaluate_policy(model, eval_env, callback=WandbCallback(verbose=2))
+
     env.close()
+    eval_env.close()
 
 if __name__ == "__main__":
     parser = ArgumentParser("stable baselines for mario kart")
