@@ -106,7 +106,9 @@ def main(args):
         env.reset()
         model.learn(total_timesteps=1000, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
         eval_env.reset()
-        evaluate_policy(model, eval_env, callback=wandb_callable)
+        res = evaluate_policy(model, eval_env)
+        wandb.log(res)
+
     model.save(model_store_path / "eval_gen_model")
     wandb.save(str(model_store_path / "eval_gen_model_wandb"))
     env.close()
