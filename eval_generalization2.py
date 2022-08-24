@@ -63,49 +63,51 @@ def main(args):
     num_t_tracks = max(args.num_tracks, len(MarioKartEnv.COURSES) - 2)
     training_tracks = all_tracks[:num_t_tracks]
     validation_track = all_tracks[-1]
-    env = SubprocVecEnv([
-        make_env(
-            i,
-            mario_kart_envs,
-            args.video_record_frequency,
-            args.video_record_path,
-            random_tracks=False,
-            auto_abort=args.auto_abort,
-            num_tracks=0,
-            containerized=args.containerized,
-            training_tracks=training_tracks
-        )
-    for i in range(args.num_envs)])
-    env.reset()
     # print(env.render(mode="rgb_array"))
 
     model = PPO("CnnPolicy", env, verbose=1, tensorboard_log=f"runs/{run_id}", learning_rate=args.lr, n_steps=args.n_steps,
-                gamma=args.gamma, gae_lambda=args.gae_lambda, batch_size=args.batch_size, n_epochs=args.n_epochs, seed=SEED)
+            gamma=args.gamma, gae_lambda=args.gae_lambda, batch_size=args.batch_size, n_epochs=args.n_epochs, seed=SEED)
 
     model_store_path = Path(args.model_store_path) / run_id
     model_store_path.mkdir(parents=True, exist_ok=True)
-    
-    model.learn(total_timesteps=args.steps, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
-    model.save(model_store_path / "eval_gen_model")
-    wandb.save(str(model_store_path / "eval_gen_model_wandb"))
-    env.close()
 
-    env = SubprocVecEnv([
+    eval_env = SubprocVecEnv([
         make_env(
             i,
             mario_kart_envs,
             args.video_record_frequency,
             args.video_record_path,
-            random_tracks=False,
+            training_tracks=[validation_track],
+            random_tracks=True,
             auto_abort=args.auto_abort,
             num_tracks=0,
-            containerized=args.containerized,
-            training_tracks=[validation_track]
+            containerized=args.containerized
         )
     for i in range(0,1)])
-    env.reset()
-    evaluate_policy(model, env, callback=WandbCallback(verbose=2))
-    env.close()
+
+    for i in range(0, args.steps_env_switch):
+        track_idx = random.randint(0, len(training_tracks)-2)
+        env = SubprocVecEnv([
+            make_env(
+                i,
+                mario_kart_envs,
+                args.video_record_frequency,
+                args.video_record_path,
+                training_tracks=[training_tracks[track_idx]],
+                random_tracks=True,
+                auto_abort=args.auto_abort,
+                num_tracks=0,
+                containerized=args.containerized
+            )
+        for i in range(args.num_envs)])
+        env.reset()
+        model.learn(total_timesteps=args.steps, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
+        model.save(model_store_path / "eval_gen_model")
+        eval_env.reset()
+        evaluate_policy(model, env, callback=WandbCallback(verbose=2))
+        wandb.save(str(model_store_path / "eval_gen_model_wandb"))
+        env.close()
+        eval_env.close()
 
 if __name__ == "__main__":
     parser = ArgumentParser("stable baselines for mario kart")

@@ -105,7 +105,7 @@ class MarioKartEnv(Mupen64PlusEnv):
     #     640: [203, 51],
     # }
 
-    def __init__(self, character='mario', course='LuigiRaceway', input_port="8082", vnc_port="5009", random_tracks=False, num_tracks=0, **kwargs):
+    def __init__(self, character='mario', course='LuigiRaceway', input_port="8082", vnc_port="5009", random_tracks=False, num_tracks=0, training_tracks=None, **kwargs):
         self._set_character(character)
         self._set_course(course)
         super(MarioKartEnv, self).__init__(
@@ -128,6 +128,8 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
         self.eligible_tracks = list(self.COURSES.keys())[:num_tracks] if num_tracks > 0 else list(self.COURSES.keys())
+        if training_tracks:
+            self.eligible_tracks = training_tracks
 
     def _load_config(self):
         self.config.update(yaml.safe_load(open(os.path.join(
