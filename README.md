@@ -10,3 +10,8 @@
 
 However, this currently gives no access to bash out, if you want to see the program output run `docker run -it --name <image_name> -p 5900 --mount source="$(pwd)/gym_mupen64plus/ROMs",target=/src/gym-mupen64plus/gym_mupen64plus/ROMs,type=bind <image_name>:<tag_name> python gym-mupen64plus/agent.py`
 
+## Generalization Eval
+a) Train on all tracks alternating and observe how long model needs to produce meaningful results
+b.1) Set num of different tracks that should be used. Train on these tracks alternating randomly. After certain amount of steps run this model on a track that was not seen yet.
+b.2) Set num of different tracks. Alternate between these tracks and switch track after x steps. Once done, run model on track it has not seen yet.
+b.3) Compare b.1 and b.2 what worked better and why
