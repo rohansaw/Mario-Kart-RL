@@ -100,7 +100,7 @@ def main(args):
     model_store_path.mkdir(parents=True, exist_ok=True)
 
     def wandb_callable(l, g):
-        wandb.log({"eval/local": l, "eval/global": g})
+        wandb.log({"eval/localreward": l["reward"]})
 
     for i in range(0, int(args.steps / 1000)):
         env.reset()
