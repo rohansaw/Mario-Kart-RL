@@ -43,6 +43,7 @@ cd .. && \
 git clone git@github.com:Snagnar/mupen64plus-input-bot.git && \
 # git clone https://github.com/snagnar/mupen64plus-input-bot && \
     cd mupen64plus-input-bot && \
+	git checkout feature/image-retrieval && \
 make all && \
 sudo make install &&
 cd .. &&

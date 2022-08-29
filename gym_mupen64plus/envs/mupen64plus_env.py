@@ -15,6 +15,7 @@ import itertools
 import inspect
 from contextlib import contextmanager
 import array
+from src.utils import next_free_port
 import wandb
 import abc
 from enum import auto
@@ -71,7 +72,7 @@ class Mupen64PlusEnv(gym.Env):
         "supersmall": (170, 128),
     }
 
-    def __init__(self, input_port="8032", vnc_port="5009", benchmark=True, resolution="supersmall", containerized=True, res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
+    def __init__(self, use_wandb=True, run=None, input_port="8032", vnc_port="5009", benchmark=True, resolution="supersmall", containerized=True, quiet=False, res_w=None, res_h=None, auto_abort=True, variable_episode_length=False, base_episode_length=20000, episode_length_increase=1, gray_scale=True):
         global SCR_W, SCR_H
         if res_w is not None and res_h is not None:
             self.res_w = res_w
@@ -83,8 +84,9 @@ class Mupen64PlusEnv(gym.Env):
         self.variable_episode_length = variable_episode_length
         self.episode_length = base_episode_length
         self.episode_length_increase = episode_length_increase
+        self.quiet = quiet
 
-        self.input_port = self._next_free_port(int(input_port))
+        self.input_port = next_free_port(int(input_port), self.quiet)
         self.vnc_port = vnc_port
         self.viewer = None
         self.benchmark = benchmark
@@ -102,18 +104,19 @@ class Mupen64PlusEnv(gym.Env):
         self.pixel_array = None
         self.container_name = ""
         self.gray_scale = gray_scale
+        self.use_wandb = use_wandb
+        self.run = run
         self._base_load_config()
         self._base_validate_config()
         self.frame_skip = self.config['FRAME_SKIP']
         if self.frame_skip < 1:
             self.frame_skip = 1
 
-        self.config["PORT_NUMBER"] = self._next_free_port(
-            self.config["PORT_NUMBER"])
         self.controller_server = self._start_controller_server()
 
         initial_disp = os.environ["DISPLAY"]
-        cprint('Initially on DISPLAY %s' % initial_disp, 'red')
+        if not self.quiet:
+            cprint('Initially on DISPLAY %s' % initial_disp, 'red')
         self.containerized = containerized
         if containerized:
             self.xvfb_process, self.emulator_process = self.start_container(
@@ -134,7 +137,8 @@ class Mupen64PlusEnv(gym.Env):
 
         # Restore the DISPLAY env var
         os.environ["DISPLAY"] = initial_disp
-        cprint('Changed back to DISPLAY %s' % os.environ["DISPLAY"], 'red')
+        if not self.quiet:
+            cprint('Changed back to DISPLAY %s' % os.environ["DISPLAY"], 'red')
 
         with self.controller_server.frame_skip_disabled():
             self._navigate_menu()
@@ -205,10 +209,12 @@ class Mupen64PlusEnv(gym.Env):
             obs = np.average(obs, axis=2, weights=[
                              0.299, 0.587, 0.114], keepdims=True).astype(np.uint8)
         if self.episode_aborted:
-            cprint("Episode aborted!", "cyan")
+            if not self.quiet:
+                cprint("Episode aborted!", "cyan")
         if self.episode_completed:
-            cprint("Episode successfully completed!", "cyan")
-            if wandb.run is not None:
+            if not self.quiet:
+                cprint("Episode successfully completed!", "cyan")
+            if self.use_wandb and wandb.run is not None:
                 wandb.log({"env/episode-stop-reason": 3})
         return obs, reward, self.episode_aborted or self.episode_completed, {}
 
@@ -257,17 +263,18 @@ class Mupen64PlusEnv(gym.Env):
 
     @abc.abstractmethod
     def _reset(self):
-        cprint('Reset called!', 'yellow')
+        if not self.quiet:
+            cprint('Reset called!', 'yellow')
         self.reset_count += 1
         self.last_episode_reward = self.episode_reward
 
         self.max_reward = max(self.max_reward, self.episode_reward)
         self.max_duration = max(self.max_duration, self.step_count)
+        # if not self.quiet:
         cprint(
-            f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
-
-        if wandb.run is not None:
-            wandb.log({
+        f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
+        if self.use_wandb and self.run is not None:
+            self.run.log({
                 "env/rewards": self.episode_reward,
                 "env/length": self.step_count,
                 "env/max-reward": self.max_reward,
@@ -276,7 +283,8 @@ class Mupen64PlusEnv(gym.Env):
         self.episode_reward = 0
         if self.reset_count > 1 and self.variable_episode_length:
             self.episode_length += self.episode_length_increase
-            cprint(f"next episode length: {self.episode_length}", "yellow")
+            if not self.quiet:
+                cprint(f"next episode length: {self.episode_length}", "yellow")
 
         self.step_count = 0
         obs = self._observe()
@@ -317,26 +325,14 @@ class Mupen64PlusEnv(gym.Env):
             control_timeout=self.config['ACTION_TIMEOUT'],
             frame_skip=self.frame_skip,
             num_pixels=num_pixels)  # TODO: Environment argument (with issue #26)
-        print('ControllerUpdater started on port ', self.input_port)
+        if not self.quiet:
+            print('ControllerUpdater started on port ', self.input_port)
         return server
 
     def _stop_controller_server(self):
         # cprint('Stop Controller Server called!', 'yellow')
         if hasattr(self, 'controller_server'):
             self.controller_server.shutdown()
-
-    def _next_free_port(self, port):
-        max_ports_to_test = 30
-        for i in range(port, port + max_ports_to_test):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                try:
-                    print("trying out port", i, "...")
-                    s.bind(('localhost', i))
-                    return i
-                except:
-                    pass
-        raise Exception(
-            f"cannot find any available port in range {port} - {port + max_ports_to_test}")
 
     def start_container(self,
                         rom_name,
@@ -384,7 +380,8 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-               "--input", input_driver_path,
+            #    "--input", input_driver_path,
+               "--input", "/src/code/install/mupen64plus-input-bot/mupen64plus-input-bot.so",
                "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
 
         if self.benchmark:
@@ -394,12 +391,12 @@ class Mupen64PlusEnv(gym.Env):
                     "run", 
                     "--name",
                     self.container_name,
-                    "-t", "-p",
+                    "-p",
                     str(self.input_port) + ":" + str(self.input_port),
                     # "-v",
                     # str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
-                    # "-v",
-                    # "/home/paul/uni/rl/Mario-Kart-RL:/src/code",
+                    "-v",
+                    "/home/Paul.Mattes/Mario-Kart-RL:/src/code",
                     "-di",
                     image,
                     self.config['XVFB_CMD'],
@@ -411,10 +408,16 @@ class Mupen64PlusEnv(gym.Env):
                     "-fbdir",
                     self.config['TMP_DIR']]
         
-        subprocess.run(xvfb_cmd)
-
+        subprocess.run(xvfb_cmd, stderr=subprocess.STDOUT)
         cprint('Starting xvfb with command: %s' % " ".join(xvfb_cmd), 'yellow')
         time.sleep(3)  # Give xvfb a couple seconds to start up
+
+        log_cmd = ["docker", "logs", self.container_name]
+        print("quiet:", self.quiet)
+        cprint("running logs ", "yellow")
+
+        log_process = subprocess.run(log_cmd, stderr=subprocess.STDOUT)
+
 
         cmd = [
             "docker",
@@ -427,14 +430,15 @@ class Mupen64PlusEnv(gym.Env):
 
         cprint('Starting emulator with comand: %s' % " ".join(cmd), 'yellow')
 
-        emulator_process = subprocess.Popen(cmd,
+        # emulator_process = subprocess.Popen(cmd, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL if self.quiet else sys.stdout)
+        emulator_process = subprocess.Popen(cmd, shell=False,
                                             stderr=subprocess.STDOUT)
 
-        emu_mon = EmulatorMonitor()
-        monitor_thread = threading.Thread(target=emu_mon.monitor_emulator,
-                                          args=[emulator_process])
-        monitor_thread.daemon = True
-        monitor_thread.start()
+        # emu_mon = EmulatorMonitor()
+        # monitor_thread = threading.Thread(target=emu_mon.monitor_emulator,
+        #                                   args=[emulator_process])
+        # monitor_thread.daemon = True
+        # monitor_thread.start()
 
         return None, emulator_process
 
@@ -568,7 +572,7 @@ class Mupen64PlusEnv(gym.Env):
         return xvfb_proc, emulator_process
 
     def _kill_emulator(self):
-        # cprint('Kill Emulator called!', 'yellow')
+        cprint('Kill Emulator called!', 'yellow')
         try:
             self._act(ControllerState.NO_OP)
             if self.emulator_process is not None:
@@ -680,58 +684,45 @@ class ControllerUpdater(object):
         self.controls = controls
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
-        # msg = "#|" + msg + f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
         msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
         msg = "#|" + (msg * 3)
-        # fs = frame_skip if self.frame_skip_enabled or force_count else 0
-        # if fs > 0:
-        #     print("WAITING FRAME SKIP:", fs)
-        #     time.sleep(2)
         image = "none".encode()
         while (image == "none".encode() or len(image) < 10):
-            # print("sending ", len(msg), "msg:", msg)
             try:
-                # self.socket.sendall(str(len(msg)).encode())
                 self.socket.sendall(msg.encode())
-                # print("reading ", self.image_buffer_size, "bytes")
-                # im_len = self.socket.recv(self.image_buffer_size)
-                # image = self.socket.recv(self.image_buffer_size)
+                image = b''
+                while True:
+                    content = self.socket.recv(self.BUFFER_SIZE)
+                    # print("got content", len(content))
+                    if not content:
+                        break
+                    image += content
+                    if len(content) < self.BUFFER_SIZE:
+                        break
             except:
                 # reconnect
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.socket.connect((self.input_host, int(self.input_port)))
+                while True:
+                    try:
+                        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        self.socket.connect((self.input_host, int(self.input_port)))
+                        self.socket.sendall(msg.encode())
+                        image = b''
+                        while True:
+                            content = self.socket.recv(self.BUFFER_SIZE)
+                            if not content:
+                                break
+                            image += content
+                            if len(content) < self.BUFFER_SIZE:
+                                break
+                        break
+                    except Exception as e:
+                        cprint(f"cannot connect: {e}, retrying...")
                 
-                # self.socket.sendall(str(len(msg)).encode())
-                self.socket.sendall(msg.encode())
-                # while True:
-                #     content = self.socket.recv(self.image_buffer_size)
-                #     if not content:
-                #         break
-                #     image += content
-            image = b''
-            while True:
-                content = self.socket.recv(self.BUFFER_SIZE)
-                # print("got content", len(content))
-                if not content:
-                    break
-                image += content
-                if len(content) < self.BUFFER_SIZE:
-                    break
-            # if len(image) < 100:
-            #     print("got image:", image)
-            #     time.sleep(3)
         if len(image) > self.image_buffer_size:
-            # print("got .... more? ")
             image = image[:self.image_buffer_size]
-            # image = np.frombuffer(image, dtype=np.uint8)[:self.image_buffer_size].tobytes()
-        # time.sleep(0.5)
-        # print("final image size: ", len(image))
         if self.image_buffer_size != len(image):
-            # print("######################################################### does not match!, using old image")
             return self.last_image
         self.last_image = image
-        # print(list(image)[:32])
-        # time.sleep(0.2)
         return image
         
 

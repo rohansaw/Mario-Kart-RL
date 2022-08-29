@@ -4,6 +4,7 @@ from multiprocessing.dummy import DummyProcess
 import gym, gym_mupen64plus
 import time
 import os
+from src.utils import next_free_port
 
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.env_checker import check_env
@@ -19,16 +20,19 @@ from wandb.integration.sb3 import WandbCallback
 os.environ['DISPLAY'] = ':0'
 
 SEED = 123
-def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, seed=SEED, **kwargs):
+def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, input_port=8030, run=None, seed=SEED, **kwargs):
     Path(video_store_path).mkdir(parents=True, exist_ok=True)
     def f():
-        time.sleep(10 * i)
+        # time.sleep(10 * i)
         # time.sleep(12 * i + 1.3 ** i)
-        env = gym.make(mario_kart_envs[i], input_port=8030 + i, **kwargs)
+        if run is not None:
+            wandb.gym.monitor()
+        env = gym.make(mario_kart_envs[i], input_port=input_port, use_wandb=(i==0), run=run, **kwargs)
         env.seed(seed + 2 ** i)
         check_env(env)
         env = Monitor(env)
-        env = gym.wrappers.RecordVideo(env, video_store_path, name_prefix=f"env-{i}-rl-video", episode_trigger=lambda x: x % video_record_frequency == 0)
+        if i == 0:
+            env = gym.wrappers.RecordVideo(env, video_store_path, name_prefix=f"env-{i}-rl-video", episode_trigger=lambda x: x % video_record_frequency == 0)
         return env
     set_random_seed(seed)
     return f
@@ -42,24 +46,32 @@ def main(args):
     # gamma: float = 0.99
     # gae_lambda: float = 0.95
 
+    wandb.require("service")
+
     config = {"project": "Stable-Baselines", "steps": args.steps, "learning_rate": args.lr, "n_epochs": args.n_epochs,
             "n_steps": args.n_steps, "gamma": args.gamma, "gae_lambda": args.gae_lambda, "batch_size": args.batch_size}
 
 
     if args.wandb:
-        run_id = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True).id
+        wandb_run = wandb.init(monitor_gym=True, config=config, sync_tensorboard=True)
+        run_id = wandb_run.id
     else:
         run_id = "run"
+        wandb_run = None
+    
+    args.n_steps = int(args.n_steps / args.num_envs)
     
     mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
     print("available envs:", mario_kart_envs)
-    
+    start_port = next_free_port(8030)
     env = SubprocVecEnv([
         make_env(
             i,
             mario_kart_envs,
             args.video_record_frequency,
             args.video_record_path,
+            input_port=start_port + i,
+            run=wandb_run,
             random_tracks=args.random_tracks,
             auto_abort=args.auto_abort,
             num_tracks=args.num_tracks,
