@@ -82,8 +82,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS_CONSIDERED_STUCK = 40
-    MIN_PROGRESS = 1.5
+    AMOUNT_STEPS_CONSIDERED_STUCK = 60
+    MIN_PROGRESS = 1.3
 
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -128,8 +128,8 @@ class MarioKartEnv(Mupen64PlusEnv):
         self.checkpoints = self.CHECKPOINTS[self.res_w]
         self.CHECKPOINT_LOCATIONS = list(self._generate_checkpoints(*self.checkpoints))
         self.eligible_tracks = list(self.COURSES.keys())[:num_tracks] if num_tracks > 0 else list(self.COURSES.keys())
-        if training_tracks:
-            self.eligible_tracks = training_tracks
+        if training_tracks is not None:
+            self.eligible_tracks = [list(self.COURSES.keys())[i] for i in training_tracks]
 
     def _load_config(self):
         self.config.update(yaml.safe_load(open(os.path.join(

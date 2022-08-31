@@ -380,8 +380,7 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-            #    "--input", input_driver_path,
-               "--input", "/src/code/install/mupen64plus-input-bot/mupen64plus-input-bot.so",
+               "--input", input_driver_path,
                "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
 
         if self.benchmark:
@@ -393,10 +392,6 @@ class Mupen64PlusEnv(gym.Env):
                     self.container_name,
                     "-p",
                     str(self.input_port) + ":" + str(self.input_port),
-                    # "-v",
-                    # str(rom_dir.resolve()) + ":/src/gym-mupen64plus/gym_mupen64plus/ROMs",
-                    "-v",
-                    "/home/Paul.Mattes/Mario-Kart-RL:/src/code",
                     "-di",
                     image,
                     self.config['XVFB_CMD'],
@@ -706,17 +701,17 @@ class ControllerUpdater(object):
                         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         self.socket.connect((self.input_host, int(self.input_port)))
                         self.socket.sendall(msg.encode())
-                        image = b''
-                        while True:
-                            content = self.socket.recv(self.BUFFER_SIZE)
-                            if not content:
-                                break
-                            image += content
-                            if len(content) < self.BUFFER_SIZE:
-                                break
                         break
                     except Exception as e:
                         cprint(f"cannot connect: {e}, retrying...")
+                image = b''
+                while True:
+                    content = self.socket.recv(self.BUFFER_SIZE)
+                    if not content:
+                        break
+                    image += content
+                    if len(content) < self.BUFFER_SIZE:
+                        break
                 
         if len(image) > self.image_buffer_size:
             image = image[:self.image_buffer_size]

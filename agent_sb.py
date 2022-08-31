@@ -6,6 +6,7 @@ import time
 import os
 from src.utils import next_free_port
 
+import numpy as np
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
@@ -13,6 +14,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecVideoRecorder, SubprocVecEnv, DummyVecEnv
 import wandb
+import random
 from gym.envs import registry
 from wandb.integration.sb3 import WandbCallback
 
@@ -20,10 +22,10 @@ from wandb.integration.sb3 import WandbCallback
 os.environ['DISPLAY'] = ':0'
 
 SEED = 123
-def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, input_port=8030, run=None, seed=SEED, **kwargs):
+def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, input_port=8030, enable_video=True, run=None, prefix="", seed=SEED, **kwargs):
     Path(video_store_path).mkdir(parents=True, exist_ok=True)
     def f():
-        # time.sleep(10 * i)
+        time.sleep(10 * i)
         # time.sleep(12 * i + 1.3 ** i)
         if run is not None:
             wandb.gym.monitor()
@@ -31,8 +33,8 @@ def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, input
         env.seed(seed + 2 ** i)
         check_env(env)
         env = Monitor(env)
-        if i == 0:
-            env = gym.wrappers.RecordVideo(env, video_store_path, name_prefix=f"env-{i}-rl-video", episode_trigger=lambda x: x % video_record_frequency == 0)
+        if i == 0 and enable_video:
+            env = gym.wrappers.RecordVideo(env, video_store_path, name_prefix=f"{prefix}-env-{i}-rl-video", episode_trigger=lambda x: x % video_record_frequency == 0)
         return env
     set_random_seed(seed)
     return f
@@ -62,12 +64,19 @@ def main(args):
     args.n_steps = int(args.n_steps / args.num_envs)
     
     mario_kart_envs = [name for name in registry.env_specs.keys() if "Mario-Kart-Discrete" in name]
+    np.random.seed(SEED)
+    indices = np.random.permutation(len(mario_kart_envs))
+    if args.num_tracks == -1:
+        args.num_tracks = len(mario_kart_envs) - 2
+    training_env_indices = indices[:args.num_tracks]
+    evaluation_env_idx = indices[min(len(mario_kart_envs), args.num_tracks + 1)]
+    
     print("available envs:", mario_kart_envs)
     start_port = next_free_port(8030)
     env = SubprocVecEnv([
         make_env(
             i,
-            mario_kart_envs,
+            [mario_kart_envs[k] for k in training_env_indices],
             args.video_record_frequency,
             args.video_record_path,
             input_port=start_port + i,
@@ -75,10 +84,30 @@ def main(args):
             random_tracks=args.random_tracks,
             auto_abort=args.auto_abort,
             num_tracks=args.num_tracks,
+            training_tracks=training_env_indices,
             containerized=args.containerized,
         )
     for i in range(args.num_envs)])
     env.reset()
+    
+    eval_env = SubprocVecEnv([
+        make_env(
+            0,
+            [mario_kart_envs[evaluation_env_idx]],
+            args.video_record_frequency,
+            args.video_record_path,
+            input_port=start_port + len(training_env_indices),
+            run=wandb_run,
+            random_tracks=args.random_tracks,
+            auto_abort=args.auto_abort,
+            num_tracks=1,
+            training_tracks=[evaluation_env_idx],
+            enable_video=False,
+            containerized=args.containerized,
+            prefix="evaluation",
+        )])
+
+    # eval_env = VecVideoRecorder(eval_env, "videos/eval", record_video_trigger=lambda x: True, video_length=-1, name_prefix="evaluation")
     # print(env.render(mode="rgb_array"))
 
     if args.from_pretrained is None:
@@ -90,7 +119,14 @@ def main(args):
     model_store_path = Path(args.model_store_path) / run_id
     model_store_path.mkdir(parents=True, exist_ok=True)
     
-    model.learn(total_timesteps=args.steps, callback=WandbCallback(verbose=2, model_save_path=model_store_path, model_save_freq=10000) if args.wandb else None)
+    model.learn(
+        total_timesteps=args.steps,
+        callback=WandbCallback(
+            verbose=2, model_save_path=model_store_path, model_save_freq=10000
+        ) if args.wandb else None,
+        eval_env=eval_env,
+        n_eval_episodes=args.n_eval_episodes,
+        eval_freq=args.eval_freq)
     model.save(model_store_path / "best_model")
     wandb.save(str(model_store_path / "best_model_wandb"))
     if args.evaluate_after_training:
@@ -112,6 +148,8 @@ if __name__ == "__main__":
     parser.add_argument("--containerized", action="store_true", default=False, help="toggles weather to abort episode if stuck")
     parser.add_argument("--auto-abort", action="store_true", default=False, help="toggles weather to abort episode if stuck")
     parser.add_argument("--num-tracks", type=int, default=2)
+    parser.add_argument("--n-eval-episodes", type=int, default=3)
+    parser.add_argument("--eval-freq", type=int, default=30000)
     parser.add_argument("--evaluate-after-training", action="store_true", default=False, help="toggles weather to evaluate model after training finished")
     parser.add_argument("--steps", type=int, default=10_000_000, help="number of steps to train")
     parser.add_argument("--batch-size", type=int, default=64)
