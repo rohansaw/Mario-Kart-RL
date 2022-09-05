@@ -88,7 +88,6 @@ def main(args):
             containerized=args.containerized,
         ) for i in range(args.num_envs)])
     env.reset()
-    time.sleep(20)
     eval_env = SubprocVecEnv([
         make_env(
             0,
