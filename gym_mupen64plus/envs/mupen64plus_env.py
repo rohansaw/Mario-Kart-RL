@@ -231,9 +231,11 @@ class Mupen64PlusEnv(gym.Env):
         self._act(ControllerState.NO_OP, count=count, force_count=True)
 
     def _press_button(self, button, times=1):
-        for _ in itertools.repeat(None, times):
+        for _ in range(times):
             self._act(button)  # Press
+            # time.sleep(0.1)
             self._act(ControllerState.NO_OP)  # and release
+            # time.sleep(0.1)
 
     def _observe(self, image=None):
         if image is None:
@@ -680,20 +682,11 @@ class ControllerUpdater(object):
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
         msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-        msg = "#|" + (msg * 3)
+        msg = "#|" + (msg * 4)
         image = "none".encode()
         while (image == "none".encode() or len(image) < 10):
             try:
                 self.socket.sendall(msg.encode())
-                image = b''
-                while True:
-                    content = self.socket.recv(self.BUFFER_SIZE)
-                    # print("got content", len(content))
-                    if not content:
-                        break
-                    image += content
-                    if len(content) < self.BUFFER_SIZE:
-                        break
             except:
                 # reconnect
                 while True:
@@ -704,15 +697,16 @@ class ControllerUpdater(object):
                         break
                     except Exception as e:
                         cprint(f"cannot connect: {e}, retrying...")
-                image = b''
-                while True:
-                    content = self.socket.recv(self.BUFFER_SIZE)
-                    if not content:
-                        break
-                    image += content
-                    if len(content) < self.BUFFER_SIZE:
-                        break
-                
+
+            image = b''
+            while True:
+                content = self.socket.recv(self.BUFFER_SIZE)
+                # print("got content", len(content))
+                if not content:
+                    break
+                image += content
+                if len(content) < self.BUFFER_SIZE:
+                    break
         if len(image) > self.image_buffer_size:
             image = image[:self.image_buffer_size]
         if self.image_buffer_size != len(image):

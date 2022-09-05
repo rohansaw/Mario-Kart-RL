@@ -82,8 +82,8 @@ class MarioKartEnv(Mupen64PlusEnv):
 
     ENABLE_CHECKPOINTS = False
 
-    AMOUNT_STEPS_CONSIDERED_STUCK = 60
-    MIN_PROGRESS = 1.3
+    AMOUNT_STEPS_CONSIDERED_STUCK = 80
+    MIN_PROGRESS = 1
 
     CHECKPOINTS = {
         160: [16, 9, 146, 111],
@@ -407,28 +407,39 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=10, wait_for='Nintendo screen')
         # input("on nintendo screen")
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
         self._wait(count=68, wait_for='Mario Kart splash screen')
+        # time.sleep(0.1)
         # input("on mario kart spash screen")
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
         self._wait(count=68, wait_for='Game Select screen')
+        # time.sleep(0.1)
         # input("on game select screen screen")
         self._navigate_game_select()
+        # time.sleep(0.1)
 
         self._wait(count=14, wait_for='Player Select screen')
         # input("on navigate player  screen")
+        # time.sleep(0.1)
         self._navigate_player_select()
+        # time.sleep(0.1)
 
         self._wait(count=31, wait_for='Map Select screen')
+        # time.sleep(0.1)
         # input("on map select screen")
         self._navigate_map_select()
+        # time.sleep(0.1)
 
         self._wait(count=46, wait_for='race to load')
+        # time.sleep(0.1)
         # input("on race screen")
 
         # Change HUD View twice to get to the one we want:
         self._cycle_hud_view(times=2)
+        # time.sleep(0.1)
         # input("on hud right screen")
 
         # Now that we have the HUD as needed, reset the race so we have a consistent starting frame:
@@ -437,25 +448,32 @@ class MarioKartEnv(Mupen64PlusEnv):
     def _navigate_game_select(self):
         # Select number of players (1 player highlighted by default)
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
         self._wait(count=3, wait_for='animation')
+        # time.sleep(0.1)
         
         # input("pressed a")
 
         # Select GrandPrix or TimeTrials (GrandPrix highlighted by default - down to switch to TimeTrials)
         self._press_button(ControllerState.JOYSTICK_DOWN)
+        # time.sleep(0.1)
         self._wait(count=3, wait_for='animation')
+        # time.sleep(0.1)
         # input("pressed down")
 
         # Select TimeTrials
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
         # input("pressed a")
 
         # Select Begin
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
         # input("pressed a")
 
         # Press OK
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
         # input("pressed a")
 
     def _navigate_player_select(self):
@@ -464,19 +482,25 @@ class MarioKartEnv(Mupen64PlusEnv):
 
         # Character selection is remembered each time, so ensure upper-left-most is selected
         self._press_button(ControllerState.JOYSTICK_UP)
+        # time.sleep(0.1)
         self._press_button(ControllerState.JOYSTICK_LEFT, times=3)
 
+        # time.sleep(0.1)
         # Navigate to character
         self._press_button(ControllerState.JOYSTICK_DOWN,
                            times=self.PLAYER_ROW)
+        # time.sleep(0.1)
         self._press_button(ControllerState.JOYSTICK_RIGHT,
                            times=self.PLAYER_COL)
+        # time.sleep(0.1)
 
         # Select character
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
         # Press OK
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
     def _navigate_map_select(self):
         print('Map series: ' + str(self.MAP_SERIES))
@@ -484,31 +508,41 @@ class MarioKartEnv(Mupen64PlusEnv):
 
         # Map series selection is remembered each time, so ensure left-most is selected
         self._press_button(ControllerState.JOYSTICK_LEFT, times=3)
+        # time.sleep(0.1)
 
         # Select map series
         self._press_button(ControllerState.JOYSTICK_RIGHT,
                            times=self.MAP_SERIES)
+        # time.sleep(0.1)
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
         # Map choice selection is remembered each time, so ensure top-most is selected
         self._press_button(ControllerState.JOYSTICK_UP, times=3)
 
+        # time.sleep(0.1)
         # Select map choice
         self._press_button(ControllerState.JOYSTICK_DOWN,
                            times=self.MAP_CHOICE)
+        # time.sleep(0.1)
         self._press_button(ControllerState.A_BUTTON)
 
+        # time.sleep(0.1)
         # Press OK
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
     def _cycle_hud_view(self, times=1):
         for _ in itertools.repeat(None, times):
             self._press_button(ControllerState.CR_BUTTON)
+        # time.sleep(0.1)
 
     def _navigate_post_race_menu(self):
         # Times screen
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
         self._wait(count=13, wait_for='Post race menu')
+        # time.sleep(0.1)
 
         # Post race menu (previous choice selected by default)
         # - Retry
@@ -522,11 +556,14 @@ class MarioKartEnv(Mupen64PlusEnv):
         # navigation is consistent. The menu doesn't cycle top to bottom or bottom to top, so we can
         # just make sure we're at the top by hitting up a few times
         self._press_button(ControllerState.JOYSTICK_UP, times=5)
+        # time.sleep(0.1)
 
         # Now we are sure to have the top entry selected
         # Go down to 'course change'
         self._press_button(ControllerState.JOYSTICK_DOWN)
+        # time.sleep(0.1)
         self._press_button(ControllerState.A_BUTTON)
+        # time.sleep(0.1)
 
     def _set_character(self, character):
         cprint(f"using character {character}!", "green")

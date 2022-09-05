@@ -25,11 +25,11 @@ SEED = 123
 def make_env(i, mario_kart_envs, video_record_frequency, video_store_path, input_port=8030, enable_video=True, run=None, prefix="", seed=SEED, **kwargs):
     Path(video_store_path).mkdir(parents=True, exist_ok=True)
     def f():
-        time.sleep(10 * i)
+        # time.sleep(20 * i)
         # time.sleep(12 * i + 1.3 ** i)
         if run is not None:
             wandb.gym.monitor()
-        env = gym.make(mario_kart_envs[i], input_port=input_port, use_wandb=(i==0), run=run, **kwargs)
+        env = gym.make(mario_kart_envs[i], input_port=input_port, use_wandb=(i==0 and enable_video), run=run, **kwargs)
         env.seed(seed + 2 ** i)
         check_env(env)
         env = Monitor(env)
@@ -86,10 +86,9 @@ def main(args):
             num_tracks=args.num_tracks,
             training_tracks=training_env_indices,
             containerized=args.containerized,
-        )
-    for i in range(args.num_envs)])
+        ) for i in range(args.num_envs)])
     env.reset()
-    
+    time.sleep(20)
     eval_env = SubprocVecEnv([
         make_env(
             0,
@@ -106,6 +105,7 @@ def main(args):
             containerized=args.containerized,
             prefix="evaluation",
         )])
+    eval_env.reset()
 
     # eval_env = VecVideoRecorder(eval_env, "videos/eval", record_video_trigger=lambda x: True, video_length=-1, name_prefix="evaluation")
     # print(env.render(mode="rgb_array"))
