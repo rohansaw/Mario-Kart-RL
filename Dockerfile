@@ -82,9 +82,6 @@ COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/
 
 RUN mkdir /roms
 
-RUN mkdir /mupen-plugin
-VOLUME /mupen-plugin
-
 RUN wget https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip -O /tmp/marioKart.zip && \
         unzip /tmp/marioKart.zip -d /roms && \
         mv "/roms/Mario Kart 64 (USA).n64" /roms/marioKart.n64

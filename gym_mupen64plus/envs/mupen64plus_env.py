@@ -391,8 +391,7 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-               "--input", "/mupen-plugin/mupen64plus-input-bot.so",
-            #    "--input", input_driver_path,
+               "--input", input_driver_path,
                "/roms/" + Path(rom_path).name]
 
         if self.benchmark:
@@ -402,8 +401,6 @@ class Mupen64PlusEnv(gym.Env):
                     "run", 
                     "--name",
                     self.container_name,
-                    "-v",
-                    "/home/paul/uni/rl/Mario-Kart-RL/install/mupen64plus-input-bot:/mupen-plugin", 
                     "-p",
                     str(self.input_port) + ":" + str(self.input_port),
                     "-di",
