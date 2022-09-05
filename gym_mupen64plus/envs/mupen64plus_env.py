@@ -218,13 +218,22 @@ class Mupen64PlusEnv(gym.Env):
                 wandb.log({"env/episode-stop-reason": 3})
         return obs, reward, self.episode_aborted or self.episode_completed, {}
 
-    def _act(self, action, count=1, force_count=False):
+    def _act(self, action, count=None, force_count=False):
         if not self.controller_server.frame_skip_enabled and not force_count:
-            for _ in itertools.repeat(None, count):
+            count = count if count is not None else 1
+            for _ in range(count):
                 image = self.controller_server.send_controls(ControllerState(action))
         else:
             image = self.controller_server.send_controls(ControllerState(
                 action), count=count, force_count=force_count)
+        
+        # print(type(image))
+        # if image is not None:
+        #     self._observe(image)
+        # else:
+        #     print("IMAGE IS NONE, WTF??")
+        # if self.pixel_array is not None:
+        #     self._render(mode="human")
         return image
 
     def _wait(self, count=1, wait_for='Unknown'):
@@ -235,6 +244,7 @@ class Mupen64PlusEnv(gym.Env):
             self._act(button)  # Press
             # time.sleep(0.1)
             self._act(ControllerState.NO_OP)  # and release
+            # self._wait(count=3)
             # time.sleep(0.1)
 
     def _observe(self, image=None):
@@ -273,8 +283,7 @@ class Mupen64PlusEnv(gym.Env):
         self.max_reward = max(self.max_reward, self.episode_reward)
         self.max_duration = max(self.max_duration, self.step_count)
         # if not self.quiet:
-        cprint(
-        f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
+        cprint(f"last episode reward: {self.episode_reward:.1f}, duration: {self.step_count}, progress: {self.total_progress}", "green")
         if self.use_wandb and self.run is not None:
             self.run.log({
                 "env/rewards": self.episode_reward,
@@ -382,8 +391,9 @@ class Mupen64PlusEnv(gym.Env):
                "--gfx", gfx_plugin,
                "--audio", "dummy",
                "--set", f"Input-Bot-Control0[port]={self.input_port}",
-               "--input", input_driver_path,
-               "/src/gym-mupen64plus/gym_mupen64plus/ROMs/" + Path(rom_path).name]
+               "--input", "/mupen-plugin/mupen64plus-input-bot.so",
+            #    "--input", input_driver_path,
+               "/roms/" + Path(rom_path).name]
 
         if self.benchmark:
             cmd = [cmd[0]] + benchmark_options + cmd[1:]
@@ -392,6 +402,8 @@ class Mupen64PlusEnv(gym.Env):
                     "run", 
                     "--name",
                     self.container_name,
+                    "-v",
+                    "/home/paul/uni/rl/Mario-Kart-RL/install/mupen64plus-input-bot:/mupen-plugin", 
                     "-p",
                     str(self.input_port) + ":" + str(self.input_port),
                     "-di",
@@ -405,8 +417,8 @@ class Mupen64PlusEnv(gym.Env):
                     "-fbdir",
                     self.config['TMP_DIR']]
         
-        subprocess.run(xvfb_cmd, stderr=subprocess.STDOUT)
         cprint('Starting xvfb with command: %s' % " ".join(xvfb_cmd), 'yellow')
+        subprocess.run(xvfb_cmd, stderr=subprocess.STDOUT)
         time.sleep(3)  # Give xvfb a couple seconds to start up
 
         log_cmd = ["docker", "logs", self.container_name]
@@ -681,10 +693,15 @@ class ControllerUpdater(object):
         self.controls = controls
         msg = self.controls.to_msg()
         frame_skip = count if count is not None else self.frame_skip
-        msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#"
-        msg = "#|" + (msg * 4)
+        msg += f"|{frame_skip if self.frame_skip_enabled or force_count else 0}#|"
+        msg = "#|" + (msg * 3)
+        msg = msg[:-1]
+        # print("sending", msg)
         image = "none".encode()
-        while (image == "none".encode() or len(image) < 10):
+        c = 0
+        while (image == "none".encode() or len(image) < 10 or self.image_buffer_size != len(image)):
+            # if c > 0:
+            #     print("AAAAAAAAAAAAAAAAAAAAAAHHHHHH RETRY!!!", len(image))
             try:
                 self.socket.sendall(msg.encode())
             except:
@@ -707,9 +724,13 @@ class ControllerUpdater(object):
                 image += content
                 if len(content) < self.BUFFER_SIZE:
                     break
+            c += 1
         if len(image) > self.image_buffer_size:
             image = image[:self.image_buffer_size]
         if self.image_buffer_size != len(image):
+            print("in controll: not received enough!")
+            # print("trying to receive something more...")
+            # content = self.socket.recv(self.BUFFER_SIZE)
             return self.last_image
         self.last_image = image
         return image

@@ -176,12 +176,16 @@ class MarioKartEnv(Mupen64PlusEnv):
                                    self.controller_server.frame_skip)
             self._wait(count=steps_to_wait,
                        wait_for='green light so we can pause')
+        self._wait(count=10)
         self._press_button(ControllerState.START_BUTTON)
+        # self._wait(count=10, wait_for='race to load')
         self._press_button(ControllerState.JOYSTICK_DOWN)
+        # self._wait(count=10, wait_for='race to load')
         self._press_button(ControllerState.JOYSTICK_DOWN)
+        # self._wait(count=10, wait_for='race to load')
         self._press_button(ControllerState.A_BUTTON)
-        self._wait(count=31, wait_for='race to load')
-
+        # input("now selecting map, press enter")
+        self._wait(count=50, wait_for='race to load')
         self._navigate_map_select()
 
         self._wait(count=46, wait_for='race to load')
@@ -507,29 +511,55 @@ class MarioKartEnv(Mupen64PlusEnv):
         print('Map choice: ' + str(self.MAP_CHOICE))
 
         # Map series selection is remembered each time, so ensure left-most is selected
+        # self._wait(count=100, wait_for='Map Select screen')
+        # print("going to left most")
         self._press_button(ControllerState.JOYSTICK_LEFT, times=3)
-        # time.sleep(0.1)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # input("done")
+        # time.sleep(3)
 
         # Select map series
+        # print("going to correct map series")
         self._press_button(ControllerState.JOYSTICK_RIGHT,
                            times=self.MAP_SERIES)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # input("done")
         # time.sleep(0.1)
+        # print("selecting map series")
         self._press_button(ControllerState.A_BUTTON)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # input("done")
         # time.sleep(0.1)
 
         # Map choice selection is remembered each time, so ensure top-most is selected
+        # print("going to most up")
         self._press_button(ControllerState.JOYSTICK_UP, times=3)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # input("done")
+        # time.sleep(2)
 
         # time.sleep(0.1)
         # Select map choice
+        # print("going to correct map")
         self._press_button(ControllerState.JOYSTICK_DOWN,
                            times=self.MAP_CHOICE)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # input("done")
+        # time.sleep(2)
         # time.sleep(0.1)
+        # print("selecting correct map")
         self._press_button(ControllerState.A_BUTTON)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # input("done")
+        # time.sleep(2)
 
         # time.sleep(0.1)
         # Press OK
+        # print("press ok")
         self._press_button(ControllerState.A_BUTTON)
+        # self._wait(count=100, wait_for='Map Select screen')
+        # time.sleep(2)
+        # input("done, press enter")
         # time.sleep(0.1)
 
     def _cycle_hud_view(self, times=1):

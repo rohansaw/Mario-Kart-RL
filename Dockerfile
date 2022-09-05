@@ -80,25 +80,14 @@ RUN wget "https://sourceforge.net/projects/virtualgl/files/${VIRTUALGL_VERSION}/
 # Copy compiled input plugin from buildstuff layer
 COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/local/lib/mupen64plus/
 
-# Copy the gym environment (current directory)
-COPY . /src/gym-mupen64plus
+RUN mkdir /roms
 
-# Install requirements & this package
-WORKDIR /src/gym-mupen64plus
-RUN pip3 install --no-cache-dir --upgrade pip
-RUN ls
-RUN pip3 install --no-cache-dir -e .
+RUN mkdir /mupen-plugin
+VOLUME /mupen-plugin
 
 RUN wget https://archive.org/download/mario-kart-64-usa/Mario%20Kart%2064%20%28USA%29.zip -O /tmp/marioKart.zip && \
-        unzip /tmp/marioKart.zip -d /src/gym-mupen64plus/gym_mupen64plus/ROMs/ && \
-        mv "/src/gym-mupen64plus/gym_mupen64plus/ROMs/Mario Kart 64 (USA).n64" /src/gym-mupen64plus/gym_mupen64plus/ROMs/marioKart.n64
-# Declare ROMs as a volume for mounting a host path outside the container
-# VOLUME /src/gym-mupen64plus/gym_mupen64plus/ROMs/
-# VOLUME /src/code
-# WORKDIR /src/code
-
-
-RUN pip3 --no-cache-dir install torch==1.12.0+cu113 torchvision==0.13.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+        unzip /tmp/marioKart.zip -d /roms && \
+        mv "/roms/Mario Kart 64 (USA).n64" /roms/marioKart.n64
 
 # Expose the default VNC port for connecting with a client/viewer outside the container
 EXPOSE 8082
